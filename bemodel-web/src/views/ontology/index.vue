@@ -308,6 +308,7 @@
                     @click="doTransition('REVIEW')"
                   >提交评审</el-button>
                   <el-button
+                    v-if="userStore.canReview"
                     type="success"
                     :disabled="!canTransition('PUBLISHED')"
                     :loading="transitioning"
@@ -320,6 +321,7 @@
                     @click="doTransition('DRAFT')"
                   >退回草稿</el-button>
                   <el-button
+                    v-if="userStore.canReview"
                     type="danger"
                     :disabled="!canTransition('DEPRECATED')"
                     :loading="transitioning"

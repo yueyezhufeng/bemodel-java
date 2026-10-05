@@ -35,8 +35,6 @@
           <LabStoryBar
             v-if="k === 'C' || storyFor(k)"
             :story="storyFor(k)"
-            :arm="k"
-            :running="running && !arms[k]"
             :done="runDone"
             class="arm-story"
           />

@@ -25,3 +25,9 @@ dist/
 .env
 .env.*
 !.env.example
+
+# 本地密钥(手动添加,勿提交)
+.env.properties
+
+# 旧演示剧场(9/14, 已被真引擎取代, 不进库)
+demo/bemodel-demo*.html

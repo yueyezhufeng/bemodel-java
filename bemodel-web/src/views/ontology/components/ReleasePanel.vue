@@ -13,7 +13,7 @@
           </div>
           <div style="display: flex; gap: 8px">
             <el-button :disabled="releases.length < 2" @click="openDiff">变更图谱</el-button>
-            <el-button type="primary" :loading="checking" @click="openPublish">发布新版本</el-button>
+            <el-button v-if="userStore.canReview" type="primary" :loading="checking" @click="openPublish">发布新版本</el-button>
           </div>
         </div>
         <el-table :data="releases" v-loading="loadingReleases" style="margin-top: 16px" size="small">
@@ -362,6 +362,8 @@
 </template>
 
 <script setup>
+import { useUserStore } from '../../../store/user'
+const userStore = useUserStore()
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { CircleCheck, CircleClose } from '@element-plus/icons-vue'
@@ -695,7 +697,10 @@ const callTypeText = (t) =>
     MISS_PROPOSAL: '缺口提案',
     QC_REVIEW: '质控点评',
     LAB_A: '实验A组',
-    LAB_B: '实验B组'
+    LAB_B: '实验B组',
+    CS_DOC_ANSWER: '文档问答',
+    EMBED_INGEST: '文档向量化',
+    EMBED_QUERY: '检索向量化'
   }[t] || t)
 
 const callTypeTag = (t) =>
@@ -714,7 +719,10 @@ const callTypeTag = (t) =>
     MISS_PROPOSAL: 'warning',
     QC_REVIEW: 'danger',
     LAB_A: 'info',
-    LAB_B: 'info'
+    LAB_B: 'info',
+    CS_DOC_ANSWER: 'primary',
+    EMBED_INGEST: 'info',
+    EMBED_QUERY: 'info'
   }[t] || 'info')
 
 const toggleLogRow = (row) => logTableRef.value?.toggleRowExpansion(row)

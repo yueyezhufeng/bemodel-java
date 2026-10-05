@@ -13,11 +13,14 @@ import com.bemodel.cs.mapper.QaTraceMapper;
 import com.bemodel.llm.DeepSeekClient;
 import com.bemodel.ontology.entity.Attribute;
 import com.bemodel.ontology.entity.Concept;
+import com.bemodel.ontology.entity.Metric;
 import com.bemodel.ontology.entity.Relation;
 import com.bemodel.ontology.mapper.AttributeMapper;
 import com.bemodel.ontology.mapper.ConceptMapper;
 import com.bemodel.ontology.mapper.RelationMapper;
+import com.bemodel.ontology.service.MetricService;
 import com.bemodel.ontology.service.MissService;
+import com.bemodel.ontology.service.ReconcileService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +39,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * 语义层驱动的开放问答（Ontology2SQL）：LLM 基于本体+映射生成查询计划，
@@ -57,10 +61,13 @@ public class SemanticQaService {
     private final ObjectMapper objectMapper;
     private final MissService missService;
     private final QaTraceMapper qaTraceMapper;
+    private final MetricService metricService;
+    private final ReconcileService reconcileService;
+    private final SemanticSceneProperties sceneProps;
 
-    /** 查询计划：LLM 产出的结构化意图（QUERY 查数 / MODEL_ANSWER 模型规则判断 / UNANSWERABLE） */
+    /** 查询计划:LLM 产出的结构化意图(QUERY 查数 / MODEL_ANSWER 模型规则判断 / UNANSWERABLE / METRIC 在册口径实测) */
     record Plan(String mode, String ds, String sql, String semantics, String reason,
-                String conclusion, String verifySql, String gapType) {
+                String conclusion, String verifySql, String gapType, List<String> metrics) {
     }
 
     /**
@@ -86,7 +93,8 @@ public class SemanticQaService {
 
     /** analytics=true 表示来自智能问数场景（缺口来源记 QA_ASK，与客服 CS_ASK 区分） */
     public Outcome answer(String q, boolean analytics) {
-        Plan plan = planQuery(q);
+        List<Metric> candidates = prefilterMetricCards(q, probedInScene());
+        Plan plan = planQuery(q, candidates);
         if (plan == null) {
             return new Outcome(null, false);
         }
@@ -100,6 +108,9 @@ public class SemanticQaService {
         }
         if ("MODEL_ANSWER".equals(plan.mode())) {
             return new Outcome(modelAnswer(q, plan), false);
+        }
+        if ("METRIC".equals(plan.mode())) {
+            return new Outcome(metricAnswer(q, plan, analytics), false);
         }
         if (!"QUERY".equals(plan.mode()) || plan.ds() == null || plan.sql().isBlank()) {
             return new Outcome(null, false);
@@ -254,6 +265,7 @@ public class SemanticQaService {
             t.setRowCount(total);
             t.setAnswer(answer);
             t.setAnswerSource(answerSource);
+            t.setPlanMode("METRIC".equals(plan.mode()) ? "METRIC" : "QUERY");
             t.setDurationMs(durationMs);
             t.setCreatedAt(java.time.LocalDateTime.now());
             qaTraceMapper.insert(t);
@@ -377,13 +389,19 @@ public class SemanticQaService {
         tables.forEach(t -> tableComment.put(t.getDsCode() + "." + t.getTableName(),
                 t.getTableComment() == null ? "" : t.getTableComment()));
         List<Mapping> mappings = mappingMapper.selectList(
-                new LambdaQueryWrapper<Mapping>().eq(Mapping::getStatus, "ACTIVE")); // 生命周期（V30）：仅生效映射进语义上下文
+                        new LambdaQueryWrapper<Mapping>().eq(Mapping::getStatus, "ACTIVE")).stream() // 生命周期（V30）：仅生效映射进语义上下文
+                .filter(m -> sceneProps.inScene(m.getDsCode())) // 双演示库收口：物理映射段只认场景数据源
+                .toList();
         Map<String, Map<String, List<Mapping>>> byDsTable = new TreeMap<>();
         for (Mapping m : mappings) {
             byDsTable.computeIfAbsent(m.getDsCode(), k -> new TreeMap<>())
                     .computeIfAbsent(m.getTableName(), k -> new ArrayList<>()).add(m);
         }
         sb.append("\n【物理映射】（概念.属性 = 数据源.表.列，枚举列为原始码=中文）\n");
+        if (byDsTable.isEmpty()) {
+            // 场景内零映射：诚实告知查数不可答并指回规则 8——不留空段让 LLM 自由发挥
+            sb.append("（当前数据源清单内没有已接映射——查数类问题回答不了，按规则 8 返回 UNANSWERABLE，严禁编造数据源或表名。）\n");
+        }
         for (Map.Entry<String, Map<String, List<Mapping>>> ds : byDsTable.entrySet()) {
             sb.append(ds.getKey()).append(":\n");
             for (Map.Entry<String, List<Mapping>> t : ds.getValue().entrySet()) {
@@ -422,10 +440,10 @@ public class SemanticQaService {
 
     // ---------- 2. 查询计划（LLM call 1） ----------
 
-    private Plan planQuery(String q) {
+    private Plan planQuery(String q, List<Metric> candidates) {
         Optional<String> r = deepSeekClient.chat("CS_SEMANTIC_PLAN",
                 "你是医疗信息平台的本体语义查询规划器，把自然语言问题编译为只读 SQL。只返回JSON，不要多余文字。",
-                buildPlanPrompt(q));
+                buildPlanPrompt(q, candidates));
         if (r.isEmpty()) {
             return null;
         }
@@ -437,7 +455,7 @@ public class SemanticQaService {
             String mode = node.path("mode").asText("");
             if ("UNANSWERABLE".equals(mode)) {
                 log.info("语义查询不可答: {}", node.path("reason").asText(""));
-                return new Plan(mode, null, null, null, node.path("reason").asText(""), null, null, gapType(node));
+                return new Plan(mode, null, null, null, node.path("reason").asText(""), null, null, gapType(node), null);
             }
             if ("MODEL_ANSWER".equals(mode)) {
                 String conclusion = node.path("conclusion").asText("").trim();
@@ -446,7 +464,19 @@ public class SemanticQaService {
                 }
                 return new Plan(mode, node.path("ds").asText("").trim(),
                         null, node.path("semantics").asText(""), null,
-                        conclusion, node.path("verifySql").asText("").trim(), null);
+                        conclusion, node.path("verifySql").asText("").trim(), null, null);
+            }
+            if ("METRIC".equals(mode)) {
+                List<String> codes = new ArrayList<>();
+                node.path("metrics").forEach(n -> codes.add(n.asText("").trim()));
+                List<String> valid = codes.stream()
+                        .filter(c -> !c.isEmpty())
+                        .filter(c -> candidates.stream().anyMatch(m -> m.getMetricCode().equals(c)))
+                        .toList();
+                if (valid.isEmpty()) {
+                    return null;
+                }
+                return new Plan("METRIC", null, null, null, null, null, null, null, valid);
             }
             if (!"QUERY".equals(mode)) {
                 return null;
@@ -456,7 +486,7 @@ public class SemanticQaService {
             if (ds.isEmpty() || sql.isEmpty()) {
                 return null;
             }
-            return new Plan(mode, ds, sql, node.path("semantics").asText(""), null, null, null, null);
+            return new Plan(mode, ds, sql, node.path("semantics").asText(""), null, null, null, null, null);
         } catch (Exception e) {
             log.warn("语义查询计划解析失败（降级）: {}", e.getMessage());
             return null;
@@ -472,7 +502,68 @@ public class SemanticQaService {
         return "AMBIGUITY".equals(g) || "VOCABULARY".equals(g) ? g : "VOCABULARY";
     }
 
-    private String buildPlanPrompt(String q) {
+    /** 问题与指标名/定义的 CJK 二元组(窗口式,零分词依赖) */
+    static Set<String> cjkBigrams(String s) {
+        Set<String> out = new LinkedHashSet<>();
+        if (s == null) {
+            return out;
+        }
+        String cjk = s.replaceAll("[^\\u4e00-\\u9fff]", "");
+        for (int i = 0; i + 1 < cjk.length(); i++) {
+            out.add(cjk.substring(i, i + 2));
+        }
+        return out;
+    }
+
+    /**
+     * 口径卡预筛(纯规则,零 LLM):重叠 >=2 视为相关,上限 5 张;零入围返回空表。
+     * 粗筛有意放宽——带范围限定的问题也会入围,由 LLM 判定是否恰是口径卡所指。
+     */
+    static List<Metric> prefilterMetricCards(String q, List<Metric> probed) {
+        Set<String> qb = cjkBigrams(q);
+        if (qb.isEmpty()) {
+            return List.of();
+        }
+        List<Metric> out = new ArrayList<>();
+        for (Metric m : probed) {
+            String text = (m.getName() == null ? "" : m.getName()) + (m.getDefinition() == null ? "" : m.getDefinition());
+            Set<String> mb = cjkBigrams(text);
+            long overlap = qb.stream().filter(mb::contains).count();
+            if (overlap >= 2) {
+                out.add(m);
+                if (out.size() == 5) {
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    /** 场景内已探针口径卡:bemodel.semantic.scene-ds 过滤(空清单=不过滤=旧行为) */
+    private List<Metric> probedInScene() {
+        return metricService.listProbed().stream()
+                .filter(m -> sceneProps.inScene(m.getDsCode()))
+                .toList();
+    }
+
+    private String buildPlanPrompt(String q, List<Metric> candidates) {
+        String cards = "";
+        if (!candidates.isEmpty()) {
+            StringBuilder sb = new StringBuilder("\n【在册口径卡】(已接实测探针,数值由平台探针出):\n");
+            for (Metric m : candidates) {
+                String def = m.getDefinition() == null ? "" : m.getDefinition();
+                if (def.length() > 80) {
+                    def = def.substring(0, 80);
+                }
+                sb.append("- ").append(m.getMetricCode()).append("(").append(m.getName()).append("): ")
+                        .append(def).append("\n");
+            }
+            sb.append("规则补充：\n")
+              .append("9. 用户问题恰好是上面某张口径卡所指的指标本身(不带科室/病区/时段等范围限定)时,")
+              .append("返回 {\"mode\":\"METRIC\",\"metrics\":[\"口径卡编码\",...]}(可多张);\n")
+              .append("   带范围限定或与口径卡所指不符的问题,忽略本条,按规则 1-8 作答。\n");
+            cards = sb.toString();
+        }
         return buildSemanticContext()
                 + "\n规则：\n"
                 + "1. ds 与表名只能取【物理映射】段中列出的数据源编码和物理表名（如 DS_CHARGE 的 pay_record），"
@@ -494,6 +585,7 @@ public class SemanticQaService {
                 + "\"verifySql\":\"SELECT COUNT(*) AS cnt, COUNT(DISTINCT inhos_no) AS patients FROM settlement\"}\n"
                 + "8. 语义层确实回答不了时返回 {\"mode\":\"UNANSWERABLE\",\"reason\":\"一句话原因\","
                 + "\"gapType\":\"AMBIGUITY 问题歧义（口径/时间范围/统计对象不明，追问用户可解） 或 VOCABULARY 本体无此概念\"}。\n"
+                + cards
                 + "\n用户问题：" + q + "\n"
                 + "只输出JSON：{\"mode\":\"QUERY\",\"ds\":\"数据源编码\",\"sql\":\"SELECT ...\",\"semantics\":\"一句话说明查了什么、用了哪些概念\"}";
     }
@@ -779,14 +871,158 @@ public class SemanticQaService {
     }
 
     private Set<String> allowedTables(String ds) {
+        if (!sceneProps.inScene(ds)) {
+            return Set.of(); // 场景外数据源：白名单为空 → 走既有 miss 回流，不放行
+        }
         return new LinkedHashSet<>(mappingMapper.selectList(new LambdaQueryWrapper<Mapping>()
                         .eq(Mapping::getDsCode, ds).eq(Mapping::getStatus, "ACTIVE"))
                 .stream().map(Mapping::getTableName).toList());
     }
 
     private Set<String> allowedColumns(String ds) {
+        if (!sceneProps.inScene(ds)) {
+            return Set.of(); // 场景外数据源：白名单为空 → 走既有 miss 回流，不放行
+        }
         return new LinkedHashSet<>(mappingMapper.selectList(new LambdaQueryWrapper<Mapping>()
                         .eq(Mapping::getDsCode, ds).eq(Mapping::getStatus, "ACTIVE"))
                 .stream().map(Mapping::getColumnName).toList());
+    }
+
+    /**
+     * METRIC 模式执行:命中口径卡逐卡跑受信探针出实测值,关联对账组摘要;LLM 只组织表达不编数。
+     * 探针失败:card.error 如实呈现,绝不回落现场 SQL(回落=数值断层回归,禁止)。
+     */
+    private Map<String, Object> metricAnswer(String q, Plan plan, boolean analytics) {
+        long start = System.currentTimeMillis();
+        List<Map<String, Object>> cards = new ArrayList<>();
+        for (String code : plan.metrics()) {
+            Metric m = metricService.getByCode(code);
+            if (m == null) {
+                continue;
+            }
+            Map<String, Object> card = new LinkedHashMap<>();
+            card.put("metricCode", m.getMetricCode());
+            card.put("name", m.getName());
+            card.put("definition", m.getDefinition());
+            card.put("formula", m.getFormula());
+            card.put("probeSql", m.getProbeSql());
+            card.put("dsCode", m.getDsCode());
+            card.put("hasProbe", m.getProbeSql() != null && !m.getProbeSql().isBlank());
+            card.put("owner", m.getOwner());
+            card.put("warnThreshold", m.getWarnThreshold());
+            try {
+                Map<String, Object> ev = metricService.evaluate(code);
+                card.put("value", ev.get("value"));
+                card.put("alarm", ev.get("alarm"));
+                card.put("evaluatedAt", ev.get("evaluatedAt"));
+            } catch (Exception e) {
+                card.put("error", e.getMessage());
+            }
+            cards.add(card);
+        }
+        List<Map<String, Object>> groups = reconcileGroupsFor(plan.metrics());
+        Optional<String> llmAnswer = composeMetricAnswer(q, cards, groups);
+        String answer = llmAnswer.orElseGet(() -> templateMetricAnswer(cards, groups));
+        String answerSource = llmAnswer.isPresent() ? "LLM" : "TEMPLATE";
+        long durationMs = System.currentTimeMillis() - start;
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("question", q);
+        result.put("intent", "口径实测");
+        result.put("router", "SEMANTIC");
+        result.put("answer", answer);
+        List<Map<String, String>> evidence = new ArrayList<>();
+        for (Map<String, Object> c : cards) {
+            String value = c.get("error") != null
+                    ? "实测失败——" + c.get("error")
+                    : String.valueOf(c.get("value")) + "（探针:" + c.get("dsCode") + "）";
+            evidence.add(Map.of("label", "口径:" + c.get("name"), "value", value));
+        }
+        result.put("evidence", evidence);
+        result.put("metricCards", cards);
+        result.put("reconcileGroups", groups);
+        String sqlSummary = cards.stream()
+                .map(c -> c.get("probeSql") == null ? "" : String.valueOf(c.get("probeSql")))
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.joining(" ; "));
+        String traceId = persistQaTrace(analytics, q, plan, truncate(sqlSummary, 1024),
+                List.of(), "", cards.size(), answer, answerSource, (int) durationMs);
+        List<Map<String, String>> links = new ArrayList<>();
+        for (Map<String, Object> c : cards) {
+            links.add(Map.of("label", "口径卡:" + c.get("name"), "route", "/glossary?metric=" + c.get("metricCode")));
+        }
+        if (traceId != null) {
+            result.put("traceId", traceId);
+            links.add(Map.of("label", "查证据链", "route", "/trace?type=QA&key=" + traceId));
+        }
+        result.put("links", links);
+        return result;
+    }
+
+    /** 命中口径卡关联的对账组(splitCodes 精确判定,不做 LIKE 裸匹配);失败不影响口径回答 */
+    private List<Map<String, Object>> reconcileGroupsFor(List<String> codes) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        try {
+            for (Map<String, Object> g : reconcileService.listGroups()) {
+                Object mc = g.get("metricCodes");
+                if (mc instanceof List<?> list && list.stream().anyMatch(c -> codes.contains(String.valueOf(c)))) {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("groupCode", g.get("groupCode"));
+                    item.put("name", g.get("name"));
+                    item.put("latestDiff", g.get("latest") == null ? null
+                            : ((Map<?, ?>) g.get("latest")).get("diffValue"));
+                    item.put("disputeStatus", g.get("disputeStatus"));
+                    out.add(item);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("对账组关联查询失败（不影响口径回答）: {}", e.getMessage());
+        }
+        return out;
+    }
+
+    /** METRIC 答案表达:LLM 只组织语言,数字全部为注入真数(callType 复用 CS_SEMANTIC_ANSWER);prompt 必含用户问题原文 */
+    private Optional<String> composeMetricAnswer(String q, List<Map<String, Object>> cards, List<Map<String, Object>> groups) {
+        StringBuilder ctx = new StringBuilder("口径实测结果（数字已由平台探针实测，只能引用不得改算）：\n");
+        for (Map<String, Object> c : cards) {
+            ctx.append("- ").append(c.get("name")).append("(").append(c.get("metricCode")).append("): ")
+                    .append(c.get("error") != null ? "实测失败——" + c.get("error") : c.get("value"))
+                    .append("\n");
+        }
+        if (!groups.isEmpty()) {
+            ctx.append("关联对账组：\n");
+            for (Map<String, Object> g : groups) {
+                ctx.append("- ").append(g.get("name")).append(": 差额 ").append(g.get("latestDiff"))
+                        .append("，分歧状态 ").append(g.get("disputeStatus")).append("\n");
+            }
+        }
+        ctx.append("\n用户问题：").append(q).append("\n")
+           .append("用两三句话回答：各口径实测值、差额与对账状态；实测失败就说失败原因，不要编数，不要再自己写 SQL。");
+        return deepSeekClient.chat("CS_SEMANTIC_ANSWER",
+                "你是医疗信息平台的口径解答员，基于给定的实测数据组织回答，不编造任何数字。",
+                ctx.toString());
+    }
+
+    /** LLM 降级的确定性模板:逐卡「口径名:值」,两卡附相差,对账组状态如实 */
+    private String templateMetricAnswer(List<Map<String, Object>> cards, List<Map<String, Object>> groups) {
+        StringBuilder sb = new StringBuilder("按在册口径卡实测：\n");
+        for (Map<String, Object> c : cards) {
+            sb.append("- ").append(c.get("name")).append(": ")
+                    .append(c.get("error") != null ? "实测失败（" + c.get("error") + "）" : c.get("value"))
+                    .append("\n");
+        }
+        if (cards.size() > 1) {
+            Object a = cards.get(0).get("value");
+            Object b = cards.get(1).get("value");
+            if (a instanceof Number x && b instanceof Number y) {
+                sb.append("两口径相差 ").append(Math.abs(x.longValue() - y.longValue())).append("。\n");
+            }
+        }
+        for (Map<String, Object> g : groups) {
+            sb.append("对账组「").append(g.get("name")).append("」差额 ")
+                    .append(g.get("latestDiff") == null ? "算不出" : g.get("latestDiff"))
+                    .append("，状态 ").append(g.get("disputeStatus")).append("。\n");
+        }
+        return sb.toString();
     }
 }

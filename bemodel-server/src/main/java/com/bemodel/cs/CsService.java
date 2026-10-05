@@ -4,10 +4,13 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.bemodel.common.BizException;
 import com.bemodel.common.PageResult;
 import com.bemodel.cs.mapper.CsFeedbackMapper;
+import com.bemodel.cs.mapper.QaTraceMapper;
 import com.bemodel.datasource.service.DatasourceService;
+import com.bemodel.knowledge.entity.Knowledge;
 import com.bemodel.link.entity.LinkNode;
 import com.bemodel.link.service.LinkService;
 import com.bemodel.llm.DeepSeekClient;
+import com.bemodel.ontology.service.MissService;
 import com.bemodel.rca.entity.RcaCase;
 import com.bemodel.rca.entity.RcaReport;
 import com.bemodel.rca.mapper.RcaCaseMapper;
@@ -46,11 +49,16 @@ public class CsService {
     private final com.bemodel.flow.FlowService flowService;
     private final com.bemodel.search.SearchService searchService;
     private final SemanticQaService semanticQaService;
+    private final SemanticSceneProperties sceneProps;
     private final CsFeedbackMapper csFeedbackMapper;
     private final com.bemodel.ontology.mapper.ConceptMapper conceptMapper;
     private final com.bemodel.ontology.mapper.MetricMapper metricMapper;
     private final ReconciliationService reconciliationService;
     private final ClarifyService clarifyService;
+    private final com.bemodel.knowledge.KnowledgeSearchService knowledgeSearchService;
+    private final MissService missService;
+    private final QaTraceMapper qaTraceMapper;
+    private final com.bemodel.knowledge.KnowledgeService knowledgeService;
 
     /**
      * 工单智能诊断：已有完成的诊断直接复用，否则自动执行（客服无感，打开即得结论）。
@@ -136,22 +144,37 @@ public class CsService {
         return result;
     }
 
-    /** 给客户看的回复话术：LLM 生成（无 Key 降级为模板拼装，演示不断链） */
+    /** 给客户看的回复话术：LLM 生成（带知识库整改依据；无 Key 降级为带真实诊断结论的模板，不编根因） */
     private String customerReply(LinkNode ticket, RcaCase rcaCase, RcaReport report) {
         String rootCause = report == null ? rcaCase.getConclusion() : report.getRootCause();
+        // 出处引用（spec §7.3）：回复文本末尾引用依据条目 code；检索不到就不提条文
+        List<Knowledge> basis = rcaCase == null ? List.of()
+                : knowledgeService.basisEntries(rcaCase.getConceptCode());
+        String citation = basis.isEmpty() ? ""
+                : "\n\n（整改依据条目：" + String.join("、", basis.stream().map(Knowledge::getCode).toList()) + "）";
         if (deepSeekClient.enabled()) {
+            String basisText = basis.isEmpty() ? "" : knowledgeService.basisText(basis);
+
             String user = "你是医院客服主管。根据以下客诉工单与平台诊断结论，写一段给客户的中文回复"
                     + "（150字内，先致歉，再说清原因与整改措施，口语化，不要技术术语）。\n"
-                    + "工单：" + ticket.getTitle() + "\n诊断结论：" + rootCause;
+                    + "工单：" + ticket.getTitle() + "\n诊断结论：" + rootCause
+                    + (basisText.isBlank() ? "" : "\n整改措施依据（整改部分务必对应，依据里没有的条文不要编）：\n" + basisText);
             Optional<String> reply = deepSeekClient.chat("CS_REPLY",
                     "你是医院客服主管，回复要专业、诚恳、简短。", user);
             if (reply.isPresent()) {
-                return reply.get();
+                return reply.get() + citation;
             }
         }
-        return "您好，非常抱歉给您带来了困扰。您反馈的「" + ticket.getTitle() + "」我们已核实："
-                + "是系统升级后状态字典未同步导致的计费异常，涉及的费用将原路退回。"
-                + "我们已同步完成规则修复并补充了核查机制，避免此类问题再次发生。感谢您的监督与理解。";
+        String honest = rootCause == null || rootCause.isBlank()
+                ? "具体原因正在人工复核"
+                : "经排查：" + rootCause;
+        return "您好，非常抱歉给您带来了困扰。您反馈的「" + ticket.getTitle() + "」我们已收到并核实。" + honest
+                + "。我们将按核查结果处理相关费用并跟进反馈，感谢您的监督与理解。" + citation;
+    }
+
+    /** 包私有供测试：降级诚实化直测 */
+    String customerReplyForTest(LinkNode ticket, RcaCase rcaCase, RcaReport report) {
+        return customerReply(ticket, rcaCase, report);
     }
 
     private boolean legacyStepNames(Long caseId) {
@@ -191,7 +214,7 @@ public class CsService {
 
     /**
      * 场景化问答：同一语义引擎按提问场景走不同路由偏好与兜底形态——
-     * CS=客服：7 类专属处置意图 + 语义层，兜底能力菜单（转介问数）；
+     * CS=客服：8 类专属处置意图 + 语义层，兜底能力菜单（转介问数）；
      * ANALYTICS=问数：口径进 Glossary、业务事实一律进语义层（Ontology2SQL），
      * 兜底场景菜单（转介客服）。LLM 只做意图归类，数字一律来自真实查询。
      */
@@ -357,6 +380,9 @@ public class CsService {
         if (matches(q, "医生", "护士", "药师", "技师", "谁", "科室", "人员")) {
             return "STAFF";
         }
+        if (matches(q, "规定", "制度", "政策", "规章", "第几条", "条文", "流程")) {
+            return "DOC_QA";
+        }
         return null;
     }
 
@@ -374,7 +400,7 @@ public class CsService {
         }
         return switch (label) {
             case "FEE", "DISPENSE_PAY", "DISPENSE_SPLIT", "DISPENSE_RETURN", "MATERIAL", "STAFF", "GLOSSARY",
-                 "SEMANTIC_QUERY" -> label;
+                 "SEMANTIC_QUERY", "DOC_QA" -> label;
             default -> null;
         };
     }
@@ -393,14 +419,19 @@ public class CsService {
                         + "SEMANTIC_QUERY=对业务事实的开放查询（数量/明细/统计/状态/库存/金额/名单），"
                         + "以及缴费发药域之外的「能不能/可不可以/是否允许」类业务规则问题"
                         + "（如合并结算、跨科室发药等），平台可按本体映射直接查业务库或按本体结构推理回答；\n"
+                        + "DOC_QA=规章制度/流程规定/政策依据类问题（某项制度怎么规定、第几条怎么写、"
+                        + "有什么要求），平台检索知识库制度文档作答并引用出处；\n"
                         + "OTHER=以上都不是。\n"
-                        + "注意：FEE/DISPENSE_PAY/DISPENSE_SPLIT/DISPENSE_RETURN/MATERIAL/STAFF/GLOSSARY 是专属能力，"
+                        + "注意：FEE/DISPENSE_PAY/DISPENSE_SPLIT/DISPENSE_RETURN/MATERIAL/STAFF/GLOSSARY/DOC_QA 是专属能力，"
                         + "只在问题问规则、流程、投诉、口径定义时选；只要问题是「查一个业务事实」"
                         + "（多少数量、哪些记录、库存还有多少、金额合计、某个状态），一律选 SEMANTIC_QUERY。\n"
                         + "辨析：DISPENSE_PAY 处理「缴费与发药两个方向的对账」（含已缴费未发药滞留）；"
                         + "涉及缴费/发药/退药的「正常吗/可以吗」也归对应 DISPENSE_* 类，不进 SEMANTIC_QUERY；"
                         + "结算方式/合并结算等缴费发药域外的规则问题才选 SEMANTIC_QUERY。\n"
-                        + "示例：「已缴费未发药正常吗」→ DISPENSE_PAY；「多个患者的处方可以一起结算吗」→ SEMANTIC_QUERY。\n");
+                        + "辨析：问「制度怎么规定」选 DOC_QA（如探视制度、退费规定）；问「业务事实上能不能/是否允许」"
+                        + "才选 SEMANTIC_QUERY；\n"
+                        + "示例：「已缴费未发药正常吗」→ DISPENSE_PAY；「多个患者的处方可以一起结算吗」→ SEMANTIC_QUERY；"
+                        + "「探视制度有什么规定」→ DOC_QA。\n");
         List<CsFeedback> mistakes = csFeedbackMapper.selectList(new LambdaQueryWrapper<CsFeedback>()
                 .eq(CsFeedback::getCorrect, 0).orderByDesc(CsFeedback::getId).last("LIMIT 10"));
         if (!mistakes.isEmpty()) {
@@ -462,6 +493,7 @@ public class CsService {
             case "MATERIAL" -> materialAnswer(q);
             case "STAFF" -> staffAnswer(q);
             case "GLOSSARY" -> glossaryAnswer(q);
+            case "DOC_QA" -> docAnswer(q);
             default -> null;
         };
     }
@@ -470,6 +502,12 @@ public class CsService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("question", q);
         return result;
+    }
+
+    /** 硬编码迁入的统一取句口：条目不可用时给诚实兜底句（不静默变 null 拼接） */
+    private String ruleSentence(String code) {
+        String content = knowledgeService.entryContent(code);
+        return content == null ? "（该场景处置依据整理中，请人工核查）" : content;
     }
 
     /** 意图：取消未退费 / 多收费 / 客诉排查 */
@@ -485,9 +523,10 @@ public class CsService {
                 .eq(LinkNode::getNodeType, "TICKET").eq(LinkNode::getStatus, "待处理").list();
         result.put("intent", "取消未退费排查");
         result.put("answer", String.format(
-                "当前全院共有 %s 名患者、%s 笔「医嘱已取消但费用未退」，合计 ¥%s。根因是 LIS v5.2 升级后撤销码 X→C，"
-                        + "HIS 计费适配器未同步。现有 %s 张待处理工单，点开即可看 AI 的完整排查过程并一键退费。",
-                impact.get("patient_cnt"), impact.get("fee_cnt"), impact.get("total_amount"), tickets.size()));
+                        "当前全院共有 %s 名患者、%s 笔「医嘱已取消但费用未退」，合计 ¥%s。",
+                        impact.get("patient_cnt"), impact.get("fee_cnt"), impact.get("total_amount"))
+                + ruleSentence("CS_RULE_FEE_ROOT")
+                + String.format("现有 %s 张待处理工单，点开即可看 AI 的完整排查过程并一键退费。", tickets.size()));
         result.put("evidence", List.of(
                 Map.of("label", "影响患者", "value", impact.get("patient_cnt") + " 人"),
                 Map.of("label", "未退费用", "value", impact.get("fee_cnt") + " 笔"),
@@ -508,10 +547,9 @@ public class CsService {
         List<Map<String, Object>> tiers = (List<Map<String, Object>>) recon.get("tiers");
         int abnormal = (Integer) recon.get("abnormalCount");
         result.put("intent", "缴费发药双向核对（语义档）");
-        result.put("answer", String.format(
-                "流程规则：缴费是发药的前置环节，先药后费属违规；反方向按归因分档：「在途待发」与"
-                        + "「凌晨批量取消」是正常差异（显式登记防误判），「真滞留」「付费后取消」需核查，"
-                        + "退药未退费是待完成中间态。跨三库实测：%d 个差异档，异常合计 %d 项，已逐条登记可查。",
+        result.put("answer", "流程规则："
+                + ruleSentence("CS_RULE_FEE_DISPENSE_ORDER")
+                + String.format("跨三库实测：%d 个差异档，异常合计 %d 项，已逐条登记可查。",
                 tiers.size(), abnormal));
         List<Map<String, Object>> evidence = new ArrayList<>();
         for (Map<String, Object> t : tiers) {
@@ -564,9 +602,9 @@ public class CsService {
         Long totalDispensed = pharmacy.queryForObject(
                 "SELECT COUNT(*) FROM dispense_record WHERE status = '1'", Long.class);
         result.put("intent", "分次发药核对");
-        result.put("answer", String.format(
-                "可以。本体上「医嘱—调剂发药→发药记录」是 1:N 关系，一张药品医嘱允许拆成多次调剂/发药（拆零、分批发药都是合法场景）。"
-                        + "实时核对药房库：当前 %d 条医嘱共产生 %d 笔发药，其中 %d 条医嘱存在多次发药%s。",
+        result.put("answer", "可以。"
+                + ruleSentence("CS_RULE_DISPENSE_SPLIT")
+                + String.format("实时核对药房库：当前 %d 条医嘱共产生 %d 笔发药，其中 %d 条医嘱存在多次发药%s。",
                 totalOrders, totalDispensed, split.size(),
                 split.isEmpty() ? "——目前全部是一单一发，未发生分次" : ""));
         result.put("evidence", List.of(
@@ -596,9 +634,8 @@ public class CsService {
                     "SELECT COUNT(*) FROM fee_detail WHERE order_id IN (" + in + ") AND fee_status = '2'", Long.class);
         }
         result.put("intent", "退药核对");
-        result.put("answer", String.format(
-                "可以退药（含部分退药），闭环上退药是发药的逆环节：药房把发药记录置为已退药，收费侧同步退费，两步必须成对。"
-                        + "实时核对：当前已退药 %d 笔，对应费用已退费 %d 笔%s。",
+        result.put("answer", ruleSentence("CS_RULE_REFUND_PAIR")
+                + String.format("实时核对：当前已退药 %d 笔，对应费用已退费 %d 笔%s。",
                 returned.size(), refundedFee,
                 returned.size() == refundedFee ? "，退药退费全部联动一致" : "，存在退药未退费的裂缝，需核查"));
         result.put("evidence", List.of(
@@ -716,6 +753,82 @@ public class CsService {
         return result;
     }
 
+    /** 意图：制度/流程/政策依据类问题——知识库文档检索作答，零命中诚实答并记知识缺口（非词表缺口） */
+    private Map<String, Object> docAnswer(String q) {
+        Map<String, Object> result = baseResult(q);
+        List<Map<String, Object>> chunks = knowledgeSearchService.search(q, 5);
+        if (chunks.isEmpty()) {
+            missService.recordMiss(q, "KNOWLEDGE", "CS_ASK");
+            result.put("intent", "制度依据查询");
+            result.put("answer", "知识库暂无相关制度依据。这个问题已记录到知识库完善池，"
+                    + "上传相关制度文档并发布后即可回答。");
+            result.put("links", List.of(Map.of(
+                    "label", "去知识库上传相关制度文档",
+                    "route", "/knowledge")));
+            return result;
+        }
+        StringBuilder ctx = new StringBuilder(
+                "请严格基于以下制度片段回答用户问题，引用《文档标题》与章节出处；片段没有的内容不要编造。\n");
+        ctx.append("用户问题：").append(q).append('\n');
+        List<String> anchors = new ArrayList<>();
+        for (Map<String, Object> c : chunks) {
+            ctx.append("-《").append(c.get("docTitle")).append("》").append(c.get("heading"))
+                    .append("：").append(c.get("content")).append('\n');
+            anchors.add(c.get("documentId") + ":" + c.get("seq"));
+        }
+        String answer;
+        String source = "TEMPLATE";
+        if (deepSeekClient.enabled()) {
+            Optional<String> reply = deepSeekClient.chat("CS_DOC_ANSWER",
+                    "你是医院制度问答助手，严格基于给定制度片段回答，不编造片段之外的条文。", ctx.toString());
+            if (reply.isPresent()) {
+                answer = reply.get();
+                source = "LLM";
+            } else {
+                answer = topChunkAnswer(chunks);
+            }
+        } else {
+            answer = topChunkAnswer(chunks);
+        }
+        result.put("intent", "制度依据查询");
+        result.put("answer", answer);
+        List<Map<String, Object>> evidence = new ArrayList<>();
+        for (Map<String, Object> c : chunks) {
+            evidence.add(Map.of(
+                    "label", "《" + c.get("docTitle") + "》" + c.get("heading"),
+                    "value", String.valueOf(c.get("content"))));
+        }
+        result.put("evidence", evidence);
+        result.put("links", List.of(Map.of(
+                "label", "去知识库查看制度文档",
+                "route", "/knowledge")));
+        persistDocTrace(q, answer, source, anchors);
+        return result;
+    }
+
+    /** 无 Key 降级：给首条片段原文+出处（宁给原文不给编造） */
+    private String topChunkAnswer(List<Map<String, Object>> chunks) {
+        Map<String, Object> top = chunks.get(0);
+        return "根据《" + top.get("docTitle") + "》" + top.get("heading") + "：" + top.get("content");
+    }
+
+    /** 文档问答证据落库（scene=CS，matched_docs=docId:seq 逗号锚点；静默降级不断链） */
+    private void persistDocTrace(String q, String answer, String source, List<String> anchors) {
+        try {
+            QaTrace trace = new QaTrace();
+            trace.setTraceId("QA-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+                    + "-" + UUID.randomUUID().toString().substring(0, 6));
+            trace.setScene("CS");
+            trace.setQuestion(q);
+            trace.setMatchedDocs(String.join(",", anchors));
+            trace.setAnswer(answer);
+            trace.setAnswerSource(source);
+            qaTraceMapper.insert(trace);
+        } catch (Exception e) {
+            log.warn("文档问答证据落库失败（不影响主流程）: {}", e.getMessage());
+        }
+    }
+
     /** 名称直命中：指标名是问题的子串（或反向），与 SearchService#nameMatch 同口径 */
     private boolean nameHits(String query, String name) {
         return name != null && !name.isEmpty() && !query.isEmpty()
@@ -732,6 +845,11 @@ public class CsService {
                 new LambdaQueryWrapper<com.bemodel.ontology.entity.Metric>()
                         .eq(com.bemodel.ontology.entity.Metric::getMetricCode, metricCode));
         if (m == null) {
+            result.put("links", List.of(Map.of("label", "去统一口径页查看全部术语", "route", "/glossary")));
+            return;
+        }
+        // 双演示库收口：场景外数据源的指标不出卡（与问数同一个语义世界），退回统一口径页通用链接
+        if (!sceneProps.inScene(m.getDsCode())) {
             result.put("links", List.of(Map.of("label", "去统一口径页查看全部术语", "route", "/glossary")));
             return;
         }
@@ -772,7 +890,8 @@ public class CsService {
                 Map.of("label", "退药核对", "value", "「发药后可以部分退药吗？」→ 退药×退费联动核对"),
                 Map.of("label", "耗材库存", "value", "「一次性输液器还有多少库存？」→ 库存=Σ入-Σ出实时账"),
                 Map.of("label", "人员归属", "value", "「王芳是谁？」→ 科室/职称/业务足迹"),
-                Map.of("label", "指标口径", "value", "「出院人数怎么算？」→ 标准定义与负责人")));
+                Map.of("label", "指标口径", "value", "「出院人数怎么算？」→ 标准定义与负责人"),
+                Map.of("label", "知识文档", "value", "「探视制度有什么规定？」→ 制度文档检索作答，引用出处")));
         result.put("links", List.of(Map.of(
                 "label", "找数据？去智能问数继续提问",
                 "route", "/ask?q=" + urlEncode(q))));

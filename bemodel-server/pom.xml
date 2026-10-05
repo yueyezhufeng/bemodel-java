@@ -77,6 +77,16 @@
             <version>5.2.0</version>
         </dependency>
         <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>2.9.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parsers-standard-package</artifactId>
+            <version>2.9.2</version>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
@@ -139,6 +149,18 @@
                             <version>1.18.46</version>
                         </path>
                     </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <!-- 测试 JVM 一律不带真实 LLM key：config.import 会把开发机 .env.properties 的 key
+                             泄进测试，让「无 Key 降级」确定性测试漂到真实 LLM 路由（结果不确定且烧真钱）。
+                             系统属性源优先级高于 config.import 带入的文件属性源；空串=hasText false=disabled -->
+                        <deepseek.api-key></deepseek.api-key>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
             <plugin>

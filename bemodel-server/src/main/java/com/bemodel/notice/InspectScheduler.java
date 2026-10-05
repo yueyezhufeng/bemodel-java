@@ -21,4 +21,14 @@ public class InspectScheduler {
             log.warn("定时巡检失败（下个周期重试）: {}", e.getMessage());
         }
     }
+
+    /** 对账组巡检:默认每日 03:17(避整点),与指标巡检互不影响;手动触发走 InspectService.runReconcileScheduled */
+    @Scheduled(cron = "${bemodel.reconcile.cron:0 17 3 * * *}")
+    public void reconcile() {
+        try {
+            log.info("对账定时巡检完成: {}", inspectService.runReconcileScheduled());
+        } catch (Exception e) {
+            log.warn("对账定时巡检失败（下个周期重试）: {}", e.getMessage());
+        }
+    }
 }

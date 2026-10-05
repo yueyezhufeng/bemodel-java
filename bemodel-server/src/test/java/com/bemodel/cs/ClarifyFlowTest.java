@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.TestPropertySource;
 
 import java.util.Map;
 import java.util.Optional;
@@ -27,6 +28,7 @@ import static org.mockito.Mockito.when;
  * 其余调用（路由/作答/追问话术）一律降级空值——分型取结构化 gapType，不嗅探 reason 文本。
  */
 @SpringBootTest
+@TestPropertySource(properties = "bemodel.semantic.scene-ds=DS_HIS")
 class ClarifyFlowTest {
 
     private static final String PREFIX = "澄清流程测试";

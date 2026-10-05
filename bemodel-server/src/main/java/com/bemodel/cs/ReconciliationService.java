@@ -38,6 +38,7 @@ public class ReconciliationService {
 
     private final DatasourceService datasourceService;
     private final ReconDiffMapper reconDiffMapper;
+    private final com.bemodel.knowledge.KnowledgeService knowledgeService;
 
     /** 凌晨批量取消窗口（未缴费超时自动取消的定时任务时段） */
     private static final int NIGHTLY_CANCEL_END_HOUR = 6;
@@ -59,6 +60,14 @@ public class ReconciliationService {
                     "缴费后医嘱被取消（非凌晨批量窗口）", "人工核对退费是否完成"),
             "NIGHTLY_CANCEL", new Tier("NIGHTLY_CANCEL", "NORMAL",
                     "凌晨批量取消窗口内的自然取消（未缴费超时自动取消）", "归因消除，不进异常清单"));
+
+    /** 归因句从知识库条目读（RECON_ATTR_<stateCode>，「改一条走审批」）；条目不可用回退内嵌原文，判定不受影响 */
+    private Tier resolveTier(String stateCode) {
+        Tier def = TIERS.get(stateCode);
+        String attribution = knowledgeService.entryContent("RECON_ATTR_" + stateCode);
+        return attribution == null ? def
+                : new Tier(def.stateCode(), def.severity(), attribution, def.suggestedAction());
+    }
 
     public Map<String, Object> reconcileDispensePay() {
         JdbcTemplate pharmacy = datasourceService.jdbc("DS_PHARMACY");
@@ -132,25 +141,32 @@ public class ReconciliationService {
 
         // 差异登记：逐条落库（失败三表模式——差异是可查数据对象，不是一次性文案）
         List<Map<String, Object>> registryRows = new ArrayList<>();
-        registryRows.addAll(persistDiffs(runId, "A", TIERS.get("VIOLATION_PREPAY_BYPASS"), prepaidBypass,
+        // 归因句改读知识条目：先解析成局部变量，persistDiffs 与 tierView 共用同一解析结果
+        Tier tPrepayBypass = resolveTier("VIOLATION_PREPAY_BYPASS");
+        Tier tReturnedPending = resolveTier("RETURNED_PENDING_REFUND");
+        Tier tStuck = resolveTier("STUCK_BACKLOG");
+        Tier tInFlight = resolveTier("IN_FLIGHT");
+        Tier tCancelledAfterPay = resolveTier("CANCELLED_AFTER_PAY");
+        Tier tNightlyCancel = resolveTier("NIGHTLY_CANCEL");
+        registryRows.addAll(persistDiffs(runId, "A", tPrepayBypass, prepaidBypass,
                 "patient_no", "dispense_id"));
-        registryRows.addAll(persistDiffs(runId, "A", TIERS.get("RETURNED_PENDING_REFUND"), returnedPendingRefund,
+        registryRows.addAll(persistDiffs(runId, "A", tReturnedPending, returnedPendingRefund,
                 "patient_no", "order_id"));
-        registryRows.addAll(persistDiffs(runId, "B", TIERS.get("STUCK_BACKLOG"), stuck, "inhos_no", "order_id"));
-        registryRows.addAll(persistDiffs(runId, "B", TIERS.get("IN_FLIGHT"), inFlight, "inhos_no", "order_id"));
-        registryRows.addAll(persistDiffs(runId, "B", TIERS.get("CANCELLED_AFTER_PAY"), cancelledAfterPay,
+        registryRows.addAll(persistDiffs(runId, "B", tStuck, stuck, "inhos_no", "order_id"));
+        registryRows.addAll(persistDiffs(runId, "B", tInFlight, inFlight, "inhos_no", "order_id"));
+        registryRows.addAll(persistDiffs(runId, "B", tCancelledAfterPay, cancelledAfterPay,
                 "inhos_no", "order_id"));
-        registryRows.addAll(persistDiffs(runId, "B", TIERS.get("NIGHTLY_CANCEL"), nightlyCancel, "inhos_no", "order_id"));
+        registryRows.addAll(persistDiffs(runId, "B", tNightlyCancel, nightlyCancel, "inhos_no", "order_id"));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
         result.put("tiers", List.of(
-                tierView("A", TIERS.get("VIOLATION_PREPAY_BYPASS"), prepaidBypass.size(), dispensed.size()),
-                tierView("A", TIERS.get("RETURNED_PENDING_REFUND"), returnedPendingRefund.size(), returned.size()),
-                tierView("B", TIERS.get("STUCK_BACKLOG"), stuck.size(), chargedDrugOrders.size()),
-                tierView("B", TIERS.get("IN_FLIGHT"), inFlight.size(), chargedDrugOrders.size()),
-                tierView("B", TIERS.get("CANCELLED_AFTER_PAY"), cancelledAfterPay.size(), chargedDrugOrders.size()),
-                tierView("B", TIERS.get("NIGHTLY_CANCEL"), nightlyCancel.size(), chargedDrugOrders.size())));
+                tierView("A", tPrepayBypass, prepaidBypass.size(), dispensed.size()),
+                tierView("A", tReturnedPending, returnedPendingRefund.size(), returned.size()),
+                tierView("B", tStuck, stuck.size(), chargedDrugOrders.size()),
+                tierView("B", tInFlight, inFlight.size(), chargedDrugOrders.size()),
+                tierView("B", tCancelledAfterPay, cancelledAfterPay.size(), chargedDrugOrders.size()),
+                tierView("B", tNightlyCancel, nightlyCancel.size(), chargedDrugOrders.size())));
         result.put("registered", registryRows.size());
         result.put("abnormalCount", prepaidBypass.size() + returnedPendingRefund.size()
                 + stuck.size() + cancelledAfterPay.size());

@@ -25,8 +25,6 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 
 const props = defineProps({
   story: { type: Array, default: null },
-  arm: { type: String, required: true },
-  running: { type: Boolean, default: false },
   done: { type: Boolean, default: false }
 })
 
@@ -61,9 +59,13 @@ const cascade = (interval) => {
     if (i >= props.story.length) stopCascade()
   }, interval)
 }
-// 签名=全部标签拼接:臂未变时轮询替换数组不重播,臂真有进展才重新点亮
-const sig = computed(() => (props.story ? props.story.map((n) => n.label).join('|') : '') + '#' + props.running)
-watch(sig, () => cascade(props.done ? 400 : 150), { immediate: true })
+// 签名=全部标签拼接:臂未变时轮询替换数组不重播,臂真有进展才重新点亮;
+// 标签串变化=新一轮运行,展开状态一并复位(重播不触发 watch,展开保持)
+const sig = computed(() => (props.story ? props.story.map((n) => n.label).join('|') : ''))
+watch(sig, () => {
+  open.value = {}
+  cascade(props.done ? 400 : 150)
+}, { immediate: true })
 watch(() => props.done, (d) => { if (d) cascade(400) })
 onBeforeUnmount(stopCascade)
 

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.bemodel.cs.mapper.ReconDiffMapper;
 import com.bemodel.datasource.service.DatasourceService;
+import com.bemodel.knowledge.KnowledgeSearchService;
 import com.bemodel.link.entity.LinkNode;
 import com.bemodel.link.service.LinkService;
 import com.bemodel.rca.entity.RcaCase;
@@ -11,9 +12,12 @@ import com.bemodel.rca.mapper.RcaCaseMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 一键处置生成退费申请 + 处置单 + 工单办结，且不可重复处置。
  * 用合成工单测试，结束全量清理，不污染演示工单。
  */
+@TestPropertySource(properties = "bemodel.semantic.scene-ds=DS_CHARGE")
 @SpringBootTest
 class CsServiceTest {
 
@@ -41,6 +46,15 @@ class CsServiceTest {
     private com.bemodel.cs.mapper.CsFeedbackMapper csFeedbackMapper;
     @Autowired
     private ReconDiffMapper reconDiffMapper;
+    @Autowired
+    private com.bemodel.ontology.mapper.OntologyMissMapper missMapper;
+    @Autowired
+    private com.bemodel.knowledge.mapper.DocumentMapper documentMapper;
+    @Autowired
+    private com.bemodel.knowledge.mapper.DocChunkMapper docChunkMapper;
+    /** 知识检索 mock：零命中降级测试与共享演示库内容、Ollama 存活解耦（本类其余测试不依赖检索结果） */
+    @MockBean
+    private KnowledgeSearchService knowledgeSearchService;
 
     /** 水位线：核对类测试会向 bm_recon_diff 落批次，结束只清理本次新增行 */
     private long reconWatermark;
@@ -221,5 +235,62 @@ class CsServiceTest {
 
         // 不可重复处置
         assertThrows(Exception.class, () -> csService.refundAction(ticket.getId(), "客服 测试"));
+    }
+
+    @Test
+    void askShouldAnswerDocQaHonestlyWhenKnowledgeEmpty() {
+        // 零命中由 mock 检索服务构造：共享演示库随时可能有含「规定」的已发布文档（FULLTEXT BOOLEAN OR），
+        // 且 Ollama 存活时向量路 similarity>0 恒命中——真实检索在此环境无法保证零命中
+        Mockito.when(knowledgeSearchService.search(Mockito.anyString(), Mockito.anyInt()))
+                .thenReturn(List.of());
+        missMapper.delete(new LambdaQueryWrapper<com.bemodel.ontology.entity.OntologyMiss>()
+                .eq(com.bemodel.ontology.entity.OntologyMiss::getTerm, "月球基地运行有什么规定？"));
+
+        Map<String, Object> r = csService.ask("月球基地运行有什么规定？");
+
+        assertEquals("制度依据查询", r.get("intent"), "制度类问题应路由到文档问答意图");
+        assertEquals("RULE", r.get("router"), "无 Key 环境应走关键词档命中 DOC_QA");
+        assertTrue(String.valueOf(r.get("answer")).contains("知识库暂无相关制度依据"),
+                "零命中应诚实答无制度依据: " + r.get("answer"));
+        Long cnt = missMapper.selectCount(new LambdaQueryWrapper<com.bemodel.ontology.entity.OntologyMiss>()
+                .eq(com.bemodel.ontology.entity.OntologyMiss::getTerm, "月球基地运行有什么规定？")
+                .eq(com.bemodel.ontology.entity.OntologyMiss::getKind, "KNOWLEDGE"));
+        assertTrue(cnt >= 1, "零命中应记 KNOWLEDGE 缺口（不再误记词表缺口）");
+        missMapper.delete(new LambdaQueryWrapper<com.bemodel.ontology.entity.OntologyMiss>()
+                .eq(com.bemodel.ontology.entity.OntologyMiss::getTerm, "月球基地运行有什么规定？"));
+    }
+
+    @Test
+    void routePromptShouldCarryDocQaLabel() {
+        String prompt = csService.routePrompt("探视制度有什么规定");
+        assertTrue(prompt.contains("DOC_QA="), "路由提示词应含 DOC_QA 标签说明");
+        assertTrue(prompt.contains("制度文档"), "标签说明应点明检索制度文档作答");
+    }
+
+    @Test
+    void customerReplyFallbackShouldNotFabricateRootCause() {
+        // 降级诚实化：无 Key 模板不得再硬编具体根因（旧模板任何工单都答「状态字典未同步」）
+        LinkNode ticket = new LinkNode();
+        ticket.setTitle("打印报告不出来");
+        RcaCase rcaCase = new RcaCase();
+        rcaCase.setConclusion("打印服务连接异常，报告任务积压");
+        rcaCase.setConceptCode("FEE_DETAIL");
+        String reply = csService.customerReplyForTest(ticket, rcaCase, null);
+        assertFalse(reply.contains("状态字典未同步"), "降级模板不得硬编根因: " + reply);
+        assertTrue(reply.contains("打印服务连接异常"), "降级模板应带真实诊断结论");
+        assertTrue(reply.contains("CS_RULE_"), "降级回复应引用知识条目出处: " + reply);
+    }
+
+    @Test
+    void customerReplyWithoutBasisOmitsCitation() {
+        // 空 citation 回归（小清理批次）：依据位检索不到时回复不得出现引用小节，也不得输出字面 null
+        LinkNode ticket = new LinkNode();
+        ticket.setTitle("打印报告不出来");
+        RcaCase rcaCase = new RcaCase();
+        rcaCase.setConclusion("打印服务连接异常，报告任务积压");
+        rcaCase.setConceptCode("NO_SUCH_CONCEPT_XYZ");
+        String reply = csService.customerReplyForTest(ticket, rcaCase, null);
+        assertFalse(reply.contains("整改依据条目"), "零命中不得编造引用: " + reply);
+        assertFalse(reply.contains("null"), "不得输出字面 null: " + reply);
     }
 }

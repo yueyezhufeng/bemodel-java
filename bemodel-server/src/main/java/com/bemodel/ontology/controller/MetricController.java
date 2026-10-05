@@ -29,8 +29,8 @@ public class MetricController {
 
     @PutMapping
     public Result<Metric> update(@RequestBody Metric metric) {
-        metricService.updateById(metric);
-        return Result.ok(metric);
+        metricService.updateContent(metric);
+        return Result.ok(metricService.getById(metric.getId()));
     }
 
     @PostMapping("/evaluate/{metricCode}")

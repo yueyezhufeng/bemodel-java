@@ -103,6 +103,35 @@
                     <div v-if="msg.text" class="mc-llm">{{ msg.text }}</div>
                   </div>
                 </template>
+                <!-- 口径实测:问题命中在册口径卡时,逐卡展示探针实测值(与指标巡检同一执行来源) -->
+                <template v-else-if="msg.metricCards?.length">
+                  <div v-if="msg.text" class="ans-body" style="margin-bottom: 6px">{{ msg.text }}</div>
+                  <div v-for="c in msg.metricCards" :key="c.metricCode" class="metric-card">
+                    <div class="mc-head">
+                      <span class="mc-name">{{ c.name }}</span>
+                      <span class="mc-code">{{ c.metricCode }}</span>
+                      <el-tag v-if="c.hasProbe" size="small" type="success" effect="plain">实测</el-tag>
+                      <el-tag v-if="c.alarm" size="small" type="danger" effect="plain">超阈值</el-tag>
+                    </div>
+                    <div class="mc-row"><b>口径定义</b><span>{{ c.definition || '-' }}</span></div>
+                    <div class="mc-row">
+                      <b>实测值</b>
+                      <span v-if="c.error" class="mc-error">实测失败——{{ c.error }}</span>
+                      <span v-else class="mc-value">{{ c.value }}<template v-if="c.evaluatedAt">（{{ c.evaluatedAt }}）</template></span>
+                    </div>
+                    <div class="mc-row"><b>计算公式</b><pre class="mc-formula">{{ c.formula || '-' }}</pre></div>
+                    <template v-if="c.probeSql">
+                      <div class="mc-probe-head">探针 SQL（与指标巡检同一执行来源）</div>
+                      <pre class="sql-code">{{ c.probeSql }}</pre>
+                    </template>
+                    <div class="mc-foot"><span>负责人：{{ c.owner || '-' }}</span></div>
+                  </div>
+                  <div v-if="msg.reconcileGroups?.length" class="mc-groups">
+                    <div v-for="g in msg.reconcileGroups" :key="g.groupCode" class="mc-group-line">
+                      对账组「{{ g.name }}」差额 {{ g.latestDiff ?? '算不出' }} · {{ disputeText(g.disputeStatus) }}
+                    </div>
+                  </div>
+                </template>
                 <div v-else class="ans-body">{{ msg.text }}</div>
                 <div v-if="msg.evidence?.length" class="ans-evidence">
                   <div v-for="(e, j) in msg.evidence" :key="j" class="ans-evidence-item">
@@ -229,20 +258,21 @@ import { useRoute } from 'vue-router'
 import { askCs, answerClarify } from '../../api/cs'
 import { ChatDotRound, Opportunity, Promotion, DataLine, ArrowDown, ArrowRight } from '@element-plus/icons-vue'
 
-// 建议问题：问数场景样例（口径/明细/统计），与 AI 客服页（服务处置样例）零重叠
+// 建议问题：问数场景样例（试点口径/查数），与 AI 客服页（服务处置样例）零重叠
 const suggestions = [
+  '9月出院多少人？',
+  '9月住院总费用是多少？',
   '出院人数怎么算？',
-  '最近10条缴费记录',
-  '昨天缴费总额是多少？',
-  '退费金额有多少？',
-  '住院患者有多少人？',
-  '住院患者名单'
+  '结算单有多少笔？',
+  '病案首页都交齐了吗？'
 ]
 
 const ROUTE_TEXT = { RULE: '规则路由', LLM: 'AI 归类', SEMANTIC: '语义查询', REFERRAL: '场景转介', NONE: '能力菜单' }
 const ROUTE_TYPE = { RULE: 'warning', LLM: 'warning', SEMANTIC: 'success', REFERRAL: 'warning', NONE: 'info' }
 const routeText = (r) => ROUTE_TEXT[r] || r || '回答'
 const routeTagType = (r) => ROUTE_TYPE[r] || 'info'
+// 对账组分歧状态 → 人话(与对账页同一套说法)
+const disputeText = (s) => ({ OPEN: '待认领', CLAIMED: '有人牵头', RESOLVED: '已裁决' }[s] || s || '—')
 
 const route = useRoute()
 const input = ref('')
@@ -267,6 +297,7 @@ const parseEmptyHint = computed(() => {
   if (!last) return '提问后，语义查询类回答会在这里展示解析过程：命中概念、关系链、查询逻辑与原始行数据'
   if (last.unanswered) return '这个问题超出了当前本体的覆盖，暂无解析可展示；本体采纳该缺口后即可被语义层回答'
   if (last.card === 'METRIC') return '口径类回答以左侧指标卡展示：定义、公式与探针 SQL 均来自指标库真实数据；数据类问题（如「最近10条缴费记录」）可展示完整语义解析'
+  if (last.metricCards?.length) return '口径实测类回答以左侧口径卡展示：实测值来自指标探针，差额与对账状态来自对账组'
   if (last.router === 'REFERRAL') return '这个问题未命中问数场景能力，可按左侧回答里的入口转 AI 客服，或换个数据问法（如「最近10条缴费记录」）'
   return '这条回答走的是「' + routeText(last.router) + '」，未产生语义解析；数据类问题（如「最近10条缴费记录」）可展示完整解析'
 })
@@ -329,10 +360,13 @@ const pushAnswer = (res) => {
     links: res.links,
     unanswered,
     clarify: res.clarifyTask || null,
+    metricCards: res.metricCards || null,
+    reconcileGroups: res.reconcileGroups || null,
     clarified: res.clarifyResolved === true
   }
   // 语义查询 → 组装右侧解析面板（概念/关系/查询逻辑/原始行，全部来自真实结构）
-  if (res.router === 'SEMANTIC') {
+  // 口径实测回答无现场 SQL/行数据,不进解析面板(左侧口径卡即证据)
+  if (res.router === 'SEMANTIC' && !res.metricCards) {
     const sqlEv = (res.evidence || []).find((e) => e.label === '执行SQL')
     msg.parse = {
       matchedConcepts: res.matchedConcepts || [],
@@ -662,6 +696,12 @@ const submitClarify = async (msg) => {
   line-height: 1.8;
   color: var(--text-secondary);
 }
+
+/* 口径实测卡(问数命中在册口径卡) */
+.mc-value { font-size: 18px; font-weight: 600; color: #409eff; }
+.mc-error { color: #f56c6c; }
+.mc-groups { margin-top: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; font-size: 13px; color: #606266; }
+.mc-group-line + .mc-group-line { margin-top: 4px; }
 
 /* 增长回路卡 */
 .unans-card {

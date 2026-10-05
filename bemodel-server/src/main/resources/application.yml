@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: bemodel-server
+  # 本地密钥可选加载：bemodel-server/.env.properties（gitignore，见 .gitignore）；环境变量优先级更高，生产用 DEEPSEEK_API_KEY 覆盖
+  config.import:
+    - optional:file:.env.properties
+    - optional:file:../.env.properties
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/bemodel_platform?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
@@ -63,6 +67,9 @@ app:
 bemodel:
   inspect:
     cron: "0 0/30 * * * *"
+  reconcile:
+    # 对账组巡检(cron 六字段含秒,默认每日 03:17 避整点;只跑 scheduled=1 的组)
+    cron: "0 17 3 * * *"
   mapping:
     # F1：AI 映射列分批大小与概念 Top-K 预筛上限（Top-K <=0 视为不筛）；
     # LLM 阶段总时间预算（秒）——超预算批次就地规则兜底，最坏总时长后端自持
@@ -73,6 +80,21 @@ bemodel:
     # AI 对比实验室(Plan 1):沙箱库名与单臂预算;克隆清单默认 12 表见 LabProps
     db-name: bemodel_lab
     arm-budget-seconds: 90
+  semantic:
+    # 语义问数场景数据源(双演示库收口):物理映射段/表列白名单/口径卡候选只认清单内数据源;
+    # 空 = 不过滤(与收口前行为一致)。默认 = 仿真试点三库,九产品线旧演示库不再进问数。
+    scene-ds: DS_HIS_INP,DS_MEDREC,DS_SETTLE
+
+# 知识双轨（借鉴 5）：文档切分与本地向量化。文档向量服务未启动 = 向量路自动关闭，纯关键词照常。
+knowledge:
+  chunk:
+    size: 500
+    overlap: 50
+  embedding:
+    base-url: ${EMBEDDING_BASE_URL:http://localhost:11434/v1}
+    model: ${EMBEDDING_MODEL:bge-m3}
+    timeout-ms: 3000
+    api-key: ${EMBEDDING_API_KEY:}
 
 logging:
   level:

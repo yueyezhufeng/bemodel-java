@@ -2,6 +2,7 @@ package com.bemodel.ontology.service;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.bemodel.common.BizException;
+import com.bemodel.common.SqlGuard;
 import com.bemodel.datasource.service.DatasourceService;
 import com.bemodel.ontology.entity.Metric;
 import com.bemodel.ontology.mapper.MetricMapper;
@@ -30,8 +31,9 @@ public class MetricService extends ServiceImpl<MetricMapper, Metric> {
         if (!StringUtils.hasText(metric.getProbeSql()) || !StringUtils.hasText(metric.getDsCode())) {
             throw new BizException("指标未绑定实测探针: " + metricCode);
         }
+        String sql = SqlGuard.requireReadOnly(metric.getProbeSql(), "探针SQL");
         Integer value = datasourceService.jdbc(metric.getDsCode())
-                .queryForObject(metric.getProbeSql(), Integer.class);
+                .queryForObject(sql, Integer.class);
 
         metric.setLastVal(value);
         metric.setLastEvalAt(LocalDateTime.now());
@@ -69,5 +71,41 @@ public class MetricService extends ServiceImpl<MetricMapper, Metric> {
 
     public Metric getByCode(String metricCode) {
         return lambdaQuery().eq(Metric::getMetricCode, metricCode).one();
+    }
+
+    /** 已绑探针的口径卡(问数候选):数据源与探针 SQL 均非空才可实测;按入库先后稳定排序(cap-5 预筛确定性) */
+    public List<Metric> listProbed() {
+        return lambdaQuery().orderByAsc(Metric::getId).list().stream()
+                .filter(m -> m.getProbeSql() != null && !m.getProbeSql().isBlank()
+                        && m.getDsCode() != null && !m.getDsCode().isBlank())
+                .toList();
+    }
+
+    /**
+     * 口径卡内容编辑(白名单直写,照 ConceptService.updateContent 纪律):
+     * metricCode/lastVal/lastEvalAt 等巡检产物不可经此改动;
+     * null 显式清空——lambdaUpdate set() 直写,避开 MyBatis-Plus NOT_NULL 更新策略跳过 null 的坑。
+     */
+    public void updateContent(Metric body) {
+        if (body.getId() == null) {
+            throw new BizException("指标 id 必填");
+        }
+        if (getById(body.getId()) == null) {
+            throw new BizException("指标不存在: " + body.getId());
+        }
+        if (body.getName() == null || body.getName().isBlank()) {
+            throw new BizException("指标名必填（口径卡的名是对外称呼，不能置空）");
+        }
+        lambdaUpdate()
+                .eq(Metric::getId, body.getId())
+                .set(Metric::getName, body.getName())
+                .set(Metric::getDefinition, body.getDefinition())
+                .set(Metric::getFormula, body.getFormula())
+                .set(Metric::getOwner, body.getOwner())
+                .set(Metric::getConceptCode, body.getConceptCode())
+                .set(Metric::getDsCode, body.getDsCode())
+                .set(Metric::getProbeSql, body.getProbeSql())
+                .set(Metric::getWarnThreshold, body.getWarnThreshold())
+                .update();
     }
 }

@@ -31,6 +31,7 @@ public class SearchService {
     private final MetricMapper metricMapper;
     private final DeepSeekClient deepSeekClient;
     private final MissService missService;
+    private final com.bemodel.knowledge.KnowledgeSearchService knowledgeSearchService;
 
     public Map<String, Object> search(String q) {
         return search(q, true);
@@ -81,6 +82,10 @@ public class SearchService {
             }
         }
 
+        // 第四池（知识双轨）：制度文档片段——append 在尾部，不抢术语/概念/指标的 top 位次
+        //（glossaryAnswer 取 hits.get(0) 作答）；命中计入 hits，避免误记词表外缺口
+        hits.addAll(knowledgeSearchService.fulltextHits(query, 5));
+
         // 本体增长回路：概念维度零命中才记"词表外说法"——指标/术语命中不算 miss；
         // 仅废弃概念命中同样不算（词有归宿，只是已下架）
         if (hits.isEmpty() && recordMiss && !deprecatedMatch) {
@@ -95,7 +100,8 @@ public class SearchService {
                 ctx.append("- [").append(h.get("type")).append("] ").append(h.get("title"))
                         .append("：").append(h.get("content")).append('\n');
             }
-            ctx.append("\n请基于以上定义用中文简洁回答用户问题（不超过200字）。若定义不足以回答，请说明缺口。");
+            ctx.append("\n请基于以上内容用中文简洁回答用户问题（不超过200字）。术语/概念/指标是口径定义，"
+                    + "《文档》条目是制度条文出处；定义不足以回答的部分请说明缺口，制度条文里没有的内容不要编。");
             Optional<String> llm = deepSeekClient.chat("SEARCH_ANSWER",
                     "你是医疗本体平台的口径解答助手，严格基于给定定义回答。", ctx.toString());
             if (llm.isPresent()) {

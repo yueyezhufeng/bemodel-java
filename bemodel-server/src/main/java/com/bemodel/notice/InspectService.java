@@ -1,6 +1,7 @@
 package com.bemodel.notice;
 
 import com.bemodel.notice.mapper.InspectRunMapper;
+import com.bemodel.ontology.entity.ReconcileGroup;
 import com.bemodel.ontology.service.MetricService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ public class InspectService {
     private final MetricService metricService;
     private final NoticeService noticeService;
     private final InspectRunMapper inspectRunMapper;
+    private final com.bemodel.ontology.service.ReconcileService reconcileService;
 
     public Map<String, Object> runAll() {
         List<Map<String, Object>> results = metricService.evaluateAll();
@@ -56,6 +58,49 @@ public class InspectService {
         result.put("noticesCreated", noticesCreated);
         result.put("runId", run.getId());
         result.put("results", results);
+        return result;
+    }
+
+    /**
+     * 对账组巡检:scheduled=1 的组逐组跑(复用 run 的假对平守卫/重跑打回全套语义);
+     * bm_reconcile_run 即留痕,不建新表。非零差额或口径算不出 → 幂等告警(键 RECON:组编码)。
+     */
+    public Map<String, Object> runReconcileScheduled() {
+        List<ReconcileGroup> groups = reconcileService.lambdaQuery()
+                .eq(ReconcileGroup::getScheduled, 1).list();
+        int ran = 0;
+        int alarmed = 0;
+        int noticesCreated = 0;
+        for (ReconcileGroup g : groups) {
+            Map<String, Object> r;
+            try {
+                r = reconcileService.run(g.getGroupCode());
+            } catch (Exception e) {
+                log.warn("对账组巡检失败({}): {}", g.getGroupCode(), e.getMessage());
+                continue;
+            }
+            ran++;
+            Object diff = r.get("diffValue");
+            String err = (String) r.get("errorMsg");
+            boolean diffNonZero = diff instanceof Number n && n.longValue() != 0;
+            boolean broken = err != null && !err.isBlank();
+            if (!diffNonZero && !broken) {
+                continue;
+            }
+            alarmed++;
+            Integer value = diff instanceof Number n ? (int) n.longValue() : null;
+            String message = diffNonZero
+                    ? String.format("对账组「%s」口径差额 %s(≠0),已打回待认领", g.getName(), value)
+                    : String.format("对账组「%s」存在失败项: %s", g.getName(), err);
+            if (noticeService.createIfAbsent("RECON:" + g.getGroupCode(), g.getName(), value, 0, message)) {
+                noticesCreated++;
+            }
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("groupsTotal", groups.size());
+        result.put("ran", ran);
+        result.put("alarmed", alarmed);
+        result.put("noticesCreated", noticesCreated);
         return result;
     }
 }

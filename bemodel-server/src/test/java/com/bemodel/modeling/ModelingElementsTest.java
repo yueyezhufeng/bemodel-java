@@ -9,7 +9,6 @@ import com.bemodel.modeling.entity.Rule;
 import com.bemodel.modeling.service.ActionService;
 import com.bemodel.modeling.service.ReleaseService;
 import com.bemodel.modeling.service.RuleService;
-import com.bemodel.search.SearchService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,9 +37,9 @@ class ModelingElementsTest {
     @Autowired
     private InstanceService instanceService;
     @Autowired
-    private SearchService searchService;
-    @Autowired
     private LlmLogService llmLogService;
+    @Autowired
+    private com.bemodel.llm.mapper.LlmLogMapper llmLogMapper;
 
     @AfterEach
     void clearAuth() {
@@ -118,12 +117,18 @@ class ModelingElementsTest {
 
     @Test
     void llmCallsShouldBeAuditedWithOntologyVersion() {
-        searchService.search("出院人数怎么算"); // 触发一次 LLM 调用（有无Key都会落日志）
-        List<com.bemodel.llm.LlmLog> logs = llmLogService.recent();
-        assertFalse(logs.isEmpty());
-        com.bemodel.llm.LlmLog latest = logs.get(0);
+        // Plan 9 起：无 Key 调用不再落审计行（DeepSeekClient 无 key 直接降级），
+        // 「审计行绑定本体版本」契约改由直写真实 LlmLogService 钉住——与 key/Ollama 存活、
+        // 共享库其他测试的落行时序彻底解耦（旧写法取「全局最新行」已被 EMBED_QUERY 行撞翻一次）
+        List<com.bemodel.llm.LlmLog> before = llmLogService.recent();
+        long beforeMaxId = before.isEmpty() ? 0 : before.get(0).getId();
+        llmLogService.log("SEARCH_ANSWER", "deepseek-v4-flash", "primary", "审计绑定本体版本-测试", 5L, true, null);
+        com.bemodel.llm.LlmLog latest = llmLogService.recent().get(0);
+        assertTrue(latest.getId() > beforeMaxId, "断言应落在新写的审计行上，而非库内既有行");
         assertEquals("SEARCH_ANSWER", latest.getCallType());
         assertNotNull(latest.getOntologyVersion(), "日志必须绑定本体版本");
         assertNotNull(latest.getLatencyMs());
+        assertEquals(1, latest.getSuccess());
+        llmLogMapper.deleteById(latest.getId()); // 测试行即写即清，演示库不留垃圾
     }
 }

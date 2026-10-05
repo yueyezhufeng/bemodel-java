@@ -39,6 +39,12 @@ const routes = [
         meta: { title: '统一口径', subtitle: '统一术语与指标口径 · 一处定义、处处复用' }
       },
       {
+        path: 'knowledge',
+        name: 'knowledge',
+        component: () => import('../views/knowledge/index.vue'),
+        meta: { title: '知识库' }
+      },
+      {
         path: 'trace',
         name: 'trace',
         component: () => import('../views/trace/index.vue'),

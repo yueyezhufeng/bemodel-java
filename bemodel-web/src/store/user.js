@@ -12,10 +12,13 @@ export const useUserStore = defineStore('user', {
   getters: {
     isLoggedIn: (s) => !!s.token,
     isViewer: (s) => s.user?.role === 'VIEWER',
+    // 评审动作可用（发布/停用/版本发布：与后端服务层 REVIEWER/ADMIN 门禁同口径）
+    canReview: (s) => s.user?.role === 'REVIEWER' || s.user?.role === 'ADMIN',
     roleText: (s) =>
-      ({ ADMIN: '管理员', EDITOR: '建模员', VIEWER: '只读' }[s.user?.role] || s.user?.role || ''),
+      ({ ADMIN: '管理员', EDITOR: '建模员', REVIEWER: '评审员', VIEWER: '只读' }[s.user?.role]
+        || s.user?.role || ''),
     roleTagType: (s) =>
-      ({ ADMIN: 'danger', EDITOR: 'success', VIEWER: 'info' }[s.user?.role] || 'info')
+      ({ ADMIN: 'danger', EDITOR: 'success', REVIEWER: 'warning', VIEWER: 'info' }[s.user?.role] || 'info')
   },
   actions: {
     loginSuccess(data) {

@@ -94,9 +94,10 @@ public class DeepSeekClient {
         long start = System.currentTimeMillis();
         ProviderEndpoint primary = props.primaryEndpoint();
         if (!primary.hasKey()) {
+            // 无 Key 是环境未配置而非调用失败：不落审计行。否则测试 JVM（surefire 钉空 key）
+            // 每次 mvn test 都向共享 dev 库刷一行零耗时失败，审计成功率被拉成假低（Plan 9 根治）。
+            // 对上层语义零变化：仍返回空走既有降级通道。
             log.warn("DeepSeek API Key 未配置，LLM 能力降级");
-            llmLogService.log(callType, primary.model(), "primary", digest(systemPrompt, userPrompt),
-                    0, false, "API Key 未配置");
             return Optional.empty();
         }
         ProviderEndpoint backup = props.backupEndpoint(primary);

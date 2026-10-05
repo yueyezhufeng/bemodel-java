@@ -49,6 +49,34 @@ class BemodelMcpToolsTest {
     }
 
     @Test
+    void renderAskEmbedsMetricCardWhenPresent() {
+        // 问数命中指标时 CsService.ask 返回内嵌口径卡（metric 字段）——MCP 文本面须把卡逐字段透出，
+        // 缺失字段（此处无 dsCode/owner）静默跳过，不得输出字面 "null"
+        Map<String, Object> r = Map.of(
+                "answer", "出院人数口径如下",
+                "metric", Map.of("definition", "统计周期内完成出院结算的住院就诊人次",
+                        "formula", "COUNT(DISTINCT 住院号)", "probeSql", "SELECT COUNT(*) FROM fee_detail",
+                        "warnThreshold", 100, "lastVal", 12));
+        String text = tools.renderAsk(r);
+        assertTrue(text.contains("—— 口径卡 ——"));
+        assertTrue(text.contains("· 口径定义：统计周期内完成出院结算的住院就诊人次"));
+        assertTrue(text.contains("· 计算公式：COUNT(DISTINCT 住院号)"));
+        assertTrue(text.contains("· 探针 SQL：SELECT COUNT(*) FROM fee_detail"));
+        assertTrue(text.contains("· 预警阈值：100"));
+        assertTrue(text.contains("· 最近实测：12"));
+        assertFalse(text.contains("数据源"), "缺失字段应整行跳过而非输出 null");
+        assertFalse(text.contains("null"));
+    }
+
+    @Test
+    void renderMetricCardAlarmedMarksThresholdExceeded() {
+        Map<String, Object> eval = Map.of("value", 305, "alarm", true,
+                "evaluatedAt", LocalDateTime.of(2026, 9, 23, 9, 30));
+        String text = tools.renderMetricCard(seedMetric(), eval);
+        assertTrue(text.contains("最近实测：305（已超预警阈值）"));
+    }
+
+    @Test
     void renderAskKeepsCapabilityMenuAsIs() {
         Map<String, Object> r = Map.of(
                 "intent", "能力引导",

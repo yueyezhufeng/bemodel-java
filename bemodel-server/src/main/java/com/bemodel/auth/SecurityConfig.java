@@ -54,6 +54,17 @@ public class SecurityConfig {
                         // 评审动作放 REVIEWER：概念发布/废弃 + 本体版本发布（服务层另有评审门禁兜底）
                         .requestMatchers(HttpMethod.POST, "/api/concept/transition/**", "/api/release/publish")
                             .hasAnyRole("ADMIN", "EDITOR", "REVIEWER")
+                        // 知识库写操作（借鉴 5）：上传/编辑/删除限管理角色；发布/审批动作放 REVIEWER
+                        //（服务层 transition 另有评审门禁+防自审兜底，对齐概念域）
+                        .requestMatchers(HttpMethod.POST, "/api/knowledge/documents/*/transition",
+                                "/api/knowledge/entries/*/transition")
+                            .hasAnyRole("ADMIN", "EDITOR", "REVIEWER")
+                        .requestMatchers(HttpMethod.POST, "/api/knowledge/**")
+                            .hasAnyRole("ADMIN", "EDITOR")
+                        .requestMatchers(HttpMethod.PUT, "/api/knowledge/**")
+                            .hasAnyRole("ADMIN", "EDITOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/knowledge/**")
+                            .hasAnyRole("ADMIN", "EDITOR")
                         .requestMatchers(HttpMethod.GET, "/api/cs/feedback/list").hasAnyRole("ADMIN", "EDITOR")
                         // 澄清任务列表是维护者视图（含用户原话证据），不开放 REVIEWER/VIEWER
                         .requestMatchers(HttpMethod.GET, "/api/cs/clarify/list").hasAnyRole("ADMIN", "EDITOR")

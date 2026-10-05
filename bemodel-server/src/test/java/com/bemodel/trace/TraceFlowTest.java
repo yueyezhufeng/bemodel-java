@@ -19,6 +19,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import com.bemodel.llm.DeepSeekClient;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -36,6 +37,7 @@ import static org.mockito.Mockito.when;
  * QA 链路用 @MockBean 喂语义计划，走真实查询后落 bm_qa_trace 再聚合还原。
  */
 @SpringBootTest
+@TestPropertySource(properties = "bemodel.semantic.scene-ds=DS_HIS")
 class TraceFlowTest {
 
     private static final String CODE = "TEST_TRACE_CONCEPT";

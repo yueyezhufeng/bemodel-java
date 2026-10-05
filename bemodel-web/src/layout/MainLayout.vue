@@ -27,6 +27,10 @@
             <el-icon><Notebook /></el-icon>
             <span>统一口径</span>
           </el-menu-item>
+          <el-menu-item index="/knowledge">
+            <el-icon><Reading /></el-icon>
+            <span>知识库</span>
+          </el-menu-item>
           <el-menu-item index="/ask">
             <el-icon><ChatDotRound /></el-icon>
             <span>智能问数</span>
@@ -168,14 +172,15 @@
           :class="{ unread: n.status === '未读' }"
         >
           <div class="notice-head">
-            <span class="notice-metric">{{ n.metricName }}（{{ n.metricCode }}）</span>
+            <span class="notice-metric">{{ n.metricName }}<span v-if="!n.metricCode?.startsWith('RECON:')">（{{ n.metricCode }}）</span></span>
             <el-tag size="small" :type="n.status === '未读' ? 'danger' : 'info'" effect="plain">
               {{ n.status }}
             </el-tag>
           </div>
           <div class="notice-message">{{ n.message }}</div>
           <div class="notice-foot">
-            <span>实测 {{ n.actualValue }} / 阈值 {{ n.threshold }} ｜ {{ n.createdAt?.replace('T', ' ') }}</span>
+            <span v-if="n.metricCode?.startsWith('RECON:')">差额 {{ n.actualValue }} ｜ {{ n.createdAt?.replace('T', ' ') }}</span>
+            <span v-else>实测 {{ n.actualValue }} / 阈值 {{ n.threshold }} ｜ {{ n.createdAt?.replace('T', ' ') }}</span>
             <el-button
               v-if="n.status === '未读' && !userStore.isViewer"
               size="small"
@@ -205,7 +210,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Platform, Collection, Connection, Notebook, ChatDotRound, Share, Tickets, FirstAidKit, Stamp, Service, DataAnalysis, Opportunity, Aim, ArrowDown, Bell } from '@element-plus/icons-vue'
+import { Platform, Collection, Connection, Notebook, ChatDotRound, Share, Tickets, FirstAidKit, Stamp, Service, DataAnalysis, Opportunity, Reading, Aim, ArrowDown, Bell } from '@element-plus/icons-vue'
 import { useUserStore } from '../store/user'
 import { version as appVersion } from '../../package.json'
 import { getLlmRoutes } from '../api/release'
