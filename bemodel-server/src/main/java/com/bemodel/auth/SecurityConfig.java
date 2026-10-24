@@ -21,15 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 安全策略（演示环境的"真安全"）：无状态 JWT；/api/auth/login 放行；
- * GET /api/** 三+评审员角色皆可；写操作（POST/PUT/DELETE）仅 ADMIN/EDITOR；
- * 例外1：/api/cs/ask、/api/cs/clarify/**、/api/search 为问答语义查询（澄清回答与提问同级），
- * /api/cs/feedback 为评议提交，各角色皆可——这些端点会产生问答伴生状态（澄清任务推进、
- * 缺口提案回流），但只写伴生表，不写建模数据（上方写不变量针对建模数据）；
- * 例外2：概念发布/废弃与本体版本发布是评审动作，REVIEWER 也放行（服务层另有评审门禁：非评审员/管理员会被拒）。
- * 401/403 统一返回 Result 风格 JSON。CORS 策略与 CorsConfig 现状一致。
- */
+/** JWT authentication and industrial metadata role boundaries. */
 @Configuration
 public class SecurityConfig {
 
@@ -45,11 +37,7 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(reg -> reg
                         .requestMatchers("/api/auth/login").permitAll()
-                        // 问一问/搜索是问答语义查询：各角色皆可（虽走 POST，只写澄清任务/缺口提案等问答伴生状态，不写建模数据）
-                        .requestMatchers(HttpMethod.POST, "/api/cs/ask", "/api/cs/clarify/**", "/api/search")
-                            .hasAnyRole("ADMIN", "EDITOR", "REVIEWER", "VIEWER")
-                        // 路由反馈：各角色皆可提交（评议）；反馈列表仅管理角色
-                        .requestMatchers(HttpMethod.POST, "/api/cs/feedback")
+                        .requestMatchers(HttpMethod.POST, "/api/search")
                             .hasAnyRole("ADMIN", "EDITOR", "REVIEWER", "VIEWER")
                         // 评审动作放 REVIEWER：概念发布/废弃 + 本体版本发布（服务层另有评审门禁兜底）
                         .requestMatchers(HttpMethod.POST, "/api/concept/transition/**", "/api/release/publish")
@@ -65,9 +53,6 @@ public class SecurityConfig {
                             .hasAnyRole("ADMIN", "EDITOR")
                         .requestMatchers(HttpMethod.DELETE, "/api/knowledge/**")
                             .hasAnyRole("ADMIN", "EDITOR")
-                        .requestMatchers(HttpMethod.GET, "/api/cs/feedback/list").hasAnyRole("ADMIN", "EDITOR")
-                        // 澄清任务列表是维护者视图（含用户原话证据），不开放 REVIEWER/VIEWER
-                        .requestMatchers(HttpMethod.GET, "/api/cs/clarify/list").hasAnyRole("ADMIN", "EDITOR")
                         .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("ADMIN", "EDITOR", "REVIEWER", "VIEWER")
                         .requestMatchers("/api/**").hasAnyRole("ADMIN", "EDITOR")
                         .anyRequest().permitAll())
@@ -75,6 +60,7 @@ public class SecurityConfig {
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((req, res, ex) -> writeJson(res, 401, "未登录或已过期"))
                         .accessDeniedHandler((req, res, ex) -> writeJson(res, 403, "权限不足")));
+        http.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
         return http.build();
     }
 

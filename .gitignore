@@ -31,3 +31,13 @@ dist/
 
 # 旧演示剧场(9/14, 已被真引擎取代, 不进库)
 demo/bemodel-demo*.html
+# ForgePilot local runtime credentials and verification output
+.runtime/
+!bemodel-web/.env.forgepilot
+forgepilot/__pycache__/
+forgepilot/**/__pycache__/
+forgepilot/results/
+
+# Vite config cache and machine-specific verification output
+*.timestamp-*.mjs
+forgepilot/verification/

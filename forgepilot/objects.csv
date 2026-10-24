@@ -1,0 +1,46 @@
+﻿code,name,domain,definition,identity,owner,source_system,source_collection,availability
+Party,业务主体,master,法人、客户、供方或认证方的业务身份；同名不自动合并。,tenant_id + source_system + source_record_id,主数据管理员,MDM / PLM,parties,demo_adapter
+Site,工厂与场地,master,组织下的物理生产、收货或认证场地。,tenant_id + source_system + source_record_id,主数据管理员,MDM / PLM,,proposed
+Material,物料,master,由受控编码、规格、基本单位和版本定义的物料。,tenant_id + source_system + source_record_id,主数据管理员,MDM / PLM,,proposed
+UomConversion,单位换算,master,同一物料下有版本及有效期的单位换算；禁止默认吨与kg等同。,tenant_id + source_system + source_record_id,主数据管理员,MDM / PLM,,proposed
+BomRevision,BOM版本,master,批准的产品物料清单版本；不覆盖历史投产依据。,tenant_id + source_system + source_record_id,主数据管理员,MDM / PLM,,proposed
+BomLine,BOM行,master,某BOM版本下的组件与精确单位用量。,tenant_id + source_system + source_record_id,主数据管理员,MDM / PLM,,proposed
+Equipment,设备与产线,master,带组织、产能单位和状态的生产资源。,tenant_id + source_system + source_record_id,主数据管理员,MDM / PLM,,proposed
+CustomerOrderLine,客户订单行,plan,客户交付承诺的最小行粒度；与内部材料需求分开。,tenant_id + source_system + source_record_id,销售 / PMC,ERP / APS,,proposed
+Demand,材料需求行,plan,ForgePilot内部齐套需求；包含用途、来源约束与当前修订。,tenant_id + source_system + source_record_id,销售 / PMC,ERP / APS,demands,demo_adapter
+ProductionOrder,生产工单,plan,绑定产品、BOM版本、产线及计划时间的制造工单。,tenant_id + source_system + source_record_id,销售 / PMC,ERP / APS,,proposed
+MaterialRequirement,工单用料需求,plan,工单BOM展开后的组件需求，保留计算依据。,tenant_id + source_system + source_record_id,销售 / PMC,ERP / APS,,proposed
+SupplierQualification,供应商资格,source,物料、组织和有效期范围内的供方准入；不替代批次放行。,tenant_id + source_system + source_record_id,采购负责人,SRM / ERP,,proposed
+SourceRequirement,来源要求,source,需求的来源类别、比例、监管链与证据要求。,tenant_id + source_system + source_record_id,采购负责人,SRM / ERP,source_requirements,demo_adapter
+ApprovedSource,批准来源,source,物料、供方、场地及有效期组合的批准来源。,tenant_id + source_system + source_record_id,采购负责人,SRM / ERP,approved_sources,demo_adapter
+Inquiry,询价与追证请求,source,按需求向特定供方发出的结构化请求。,tenant_id + source_system + source_record_id,采购负责人,SRM / ERP,requests,demo_adapter
+Offer,供货报价,source,有数量、费用、时效和未决条件的供方报价；不是库存。,tenant_id + source_system + source_record_id,采购负责人,SRM / ERP,offers,demo_adapter
+SupplierReply,供方回复,source,供方带渠道和时间的声明；人工转录不视作已核真的源事实。,tenant_id + source_system + source_record_id,采购负责人,SRM / ERP,supplier_replies,demo_adapter
+Commitment,双方供货承诺,source,绑定需求版本和条件的双方承诺，签署不产生实际可用量。,tenant_id + source_system + source_record_id,采购负责人,SRM / ERP,state.commitment,demo_adapter
+Shipment,供方发运,inbound,发运声明与偏差记录，不能替代仓库接收。,tenant_id + source_system + source_record_id,仓库负责人,WMS / TMS,,proposed
+GoodsReceipt,到货接收回执,inbound,WMS接收事实回执；同一business_id不得重复入账。,tenant_id + source_system + source_record_id,仓库负责人,WMS / TMS,receipts:goods_receipt,demo_adapter
+Lot,库存批次,inbound,有所有权、场地、物料和实物量的批次，质量与来源分别核验。,tenant_id + source_system + source_record_id,仓库负责人,WMS / TMS,lots,demo_adapter
+Reservation,库存预留,inbound,需求对批次的有效占用；冻结预留不得挪用。,tenant_id + source_system + source_record_id,仓库负责人,WMS / TMS,reservations,demo_adapter
+Evidence,证据记录,quality,证据身份与适用主体/场地；有效内容在EvidenceVersion中。,tenant_id + source_system + source_record_id,质量负责人,QMS / 证书平台,evidence,demo_adapter
+EvidenceVersion,证据版本,quality,追加式证据版本及覆盖批次、交货单行、数量；撤回与更正保留。,tenant_id + evidence_id + version,质量负责人,QMS / 证书平台,evidence.versions,demo_adapter
+Inspection,性能检验回执,quality,QMS性能检验事实，与来源资格和最终放行分别记录。,tenant_id + source_system + source_record_id,质量负责人,QMS / 证书平台,receipts:inspection,demo_adapter
+SourceVerification,来源核验回执,quality,对具体证据版本、批次和交货范围的核验。,tenant_id + source_system + source_record_id,质量负责人,QMS / 证书平台,receipts:source_verification,demo_adapter
+ReleaseDecision,授权放行回执,quality,授权角色依据当前范围确认放行；不由Agent自动执行。,tenant_id + source_system + source_record_id,质量负责人,QMS / 证书平台,receipts:release,demo_adapter
+MaterialIssue,生产领料,make,WMS出库到工单的消耗事实，不能由预留推断。,tenant_id + source_system + source_record_id,生产负责人,MES,,proposed
+ProductionReport,生产报工,make,MES实际产出、报废与时间，不用计划量代替。,tenant_id + source_system + source_record_id,生产负责人,MES,,proposed
+LotGenealogy,批次谱系分配,make,投入批次到产出批次的带量关系，分拆混料均保留依据。,tenant_id + source_system + source_record_id,生产负责人,MES,,proposed
+Nonconformance,不合格事项,make,有隔离范围、原因与处置审批的不合格事件。,tenant_id + source_system + source_record_id,生产负责人,MES,,proposed
+Delivery,客户发运交付,deliver,客户订单行与实际出库批次的交付行。,tenant_id + source_system + source_record_id,物流负责人,TMS / ERP,,proposed
+CustomerAcceptance,客户签收验收,deliver,客户签收与验收事实，不等同发运完成。,tenant_id + source_system + source_record_id,物流负责人,TMS / ERP,,proposed
+PurchaseOrderLine,采购订单行,finance,采购合同下的订货与计价行；承诺不能冒充正式采购单。,tenant_id + source_system + source_record_id,财务负责人,ERP / 财务,,proposed
+Invoice,供应商发票,finance,有币种、税额和冲红关系的应付发票。,tenant_id + source_system + source_record_id,财务负责人,ERP / 财务,,proposed
+InvoiceAllocation,发票采购分配,finance,发票向采购订单行的带金额关系，防止多对多汇总膨胀。,tenant_id + source_system + source_record_id,财务负责人,ERP / 财务,,proposed
+Payment,付款事件,finance,权威财务付款或冲销事件，不从采购结清状态推断。,tenant_id + source_system + source_record_id,财务负责人,ERP / 财务,,proposed
+PaymentAllocation,付款发票分配,finance,付款向发票的带金额分配；未分配余额显式保留。,tenant_id + source_system + source_record_id,财务负责人,ERP / 财务,,proposed
+ProcurementSettlement,采购结清,finance,采购数量、费用、责任的管理结清；不代表已经付款。,tenant_id + source_system + source_record_id,财务负责人,ERP / 财务,,proposed
+ReturnOrder,退供与退货单,service,有原交易、原因及实际退回回执的逆向物流。,tenant_id + source_system + source_record_id,售后 / 质量,CRM / QMS / WMS,,proposed
+Disposition,余料与异常处置,service,受限余料的授权、执行与结案记录；授权不扣库存。,tenant_id + source_system + source_record_id,售后 / 质量,CRM / QMS / WMS,state.remainders,demo_adapter
+ServiceCase,售后与质量索赔,service,客户投诉、质量追溯和赔付责任的独立生命周期。,tenant_id + source_system + source_record_id,售后 / 质量,CRM / QMS / WMS,,proposed
+ActionReceipt,业务动作回执,govern,ERP/WMS/QMS/供方的事实回执，按business_id幂等。,tenant_id + source_system + source_record_id,业务审核人 / 模型管理员,ForgePilot,receipts,demo_adapter
+DecisionRecord,决策记录,govern,基于确切快照和规则版本的建议或人工裁定，不能代替回执。,tenant_id + source_system + source_record_id,业务审核人 / 模型管理员,ForgePilot,,proposed
+ModelRelease,模型发布,govern,对象、映射、规则和动作契约组合的不可变发布定义。,tenant_id + source_system + source_record_id,业务审核人 / 模型管理员,ForgePilot,,proposed

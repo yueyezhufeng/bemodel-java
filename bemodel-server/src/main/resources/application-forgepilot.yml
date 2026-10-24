@@ -1,0 +1,19 @@
+# The only application mode. These overrides also support an explicit forgepilot profile.
+server:
+  address: 127.0.0.1
+  port: ${FORGEPILOT_MODEL_PORT:18081}
+spring:
+  application:
+    name: forgepilot-ontology
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/forgepilot_industrial?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+  flyway:
+    locations: classpath:db/industrial
+    baseline-on-migrate: false
+  web:
+    resources:
+      static-locations: ${FORGEPILOT_WEB_LOCATION:file:../bemodel-web/dist/}
+bemodel:
+  domain-context: 工业供应链管理
+  proposal:
+    cron: "-"

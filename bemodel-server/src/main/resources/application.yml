@@ -1,25 +1,27 @@
 server:
-  port: 18080
+  address: 127.0.0.1
+  port: ${FORGEPILOT_MODEL_PORT:18081}
 
 spring:
   application:
-    name: bemodel-server
-  # 本地密钥可选加载：bemodel-server/.env.properties（gitignore，见 .gitignore）；环境变量优先级更高，生产用 DEEPSEEK_API_KEY 覆盖
+    name: forgepilot-ontology
+  profiles:
+    default: forgepilot
   config.import:
     - optional:file:.env.properties
     - optional:file:../.env.properties
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3306/bemodel_platform?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/forgepilot_industrial?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: ${MYSQL_USERNAME:}
     password: ${MYSQL_PASSWORD:}
   flyway:
     enabled: true
-    locations: classpath:db/migration
-    # 演示数据源种子(V3 等)的连接账号走 Flyway placeholders，与平台库账号同源
-    placeholders:
-      demo_db_username: ${MYSQL_USERNAME:}
-      demo_db_password: ${MYSQL_PASSWORD:}
+    locations: classpath:db/industrial
+    baseline-on-migrate: false
+  web:
+    resources:
+      static-locations: ${FORGEPILOT_WEB_LOCATION:file:../bemodel-web/dist/}
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
@@ -39,53 +41,29 @@ deepseek:
   api-key: ${DEEPSEEK_API_KEY:}
   model: deepseek-v4-flash
   timeout-seconds: 30
-  # F1：输出上限与按调用类型超时（秒）——未列出的 callType 回落全局值；代码内置 MAPPING_SUGGEST=90
   max-tokens: 4096
   call-timeouts:
     MAPPING_SUGGEST: 90
-    LAB_A: 60
-    LAB_B: 60
-  call-max-tokens:
-    LAB_A: 2048
-    LAB_B: 2048
-  # 借鉴 4：主备双端点路由——backup.api-key 空 = 无备路（行为与单提供方时代逐字节一致）。
-  # 启用备路：export DEEPSEEK_BACKUP_BASE_URL=... DEEPSEEK_BACKUP_API_KEY=...（model 空=同主路模型）
   backup:
     base-url: ${DEEPSEEK_BACKUP_BASE_URL:}
     api-key: ${DEEPSEEK_BACKUP_API_KEY:}
     model: ${DEEPSEEK_BACKUP_MODEL:}
-  # 按 callType 指定主路（"primary"|"backup"）：未列出的 callType 走主路；值非法回落主路
   call-primary-route: {}
 
-# 安全：JWT 签名密钥 / 字段级加密密钥（默认值为演示便利，生产必须经环境变量覆盖）
 jwt:
   secret: ${JWT_SECRET:}
 app:
   secret-key: ${APP_SECRET_KEY:}
 
-# 指标定时巡检（cron 六字段含秒，默认每 30 分钟；手动触发 POST /api/inspect/run）
 bemodel:
-  inspect:
-    cron: "0 0/30 * * * *"
-  reconcile:
-    # 对账组巡检(cron 六字段含秒,默认每日 03:17 避整点;只跑 scheduled=1 的组)
-    cron: "0 17 3 * * *"
+  domain-context: 工业供应链管理
   mapping:
-    # F1：AI 映射列分批大小与概念 Top-K 预筛上限（Top-K <=0 视为不筛）；
-    # LLM 阶段总时间预算（秒）——超预算批次就地规则兜底，最坏总时长后端自持
     llm-batch-size: 25
     top-k-concepts: 25
     llm-budget-seconds: 280
-  lab:
-    # AI 对比实验室(Plan 1):沙箱库名与单臂预算;克隆清单默认 12 表见 LabProps
-    db-name: bemodel_lab
-    arm-budget-seconds: 90
-  semantic:
-    # 语义问数场景数据源(双演示库收口):物理映射段/表列白名单/口径卡候选只认清单内数据源;
-    # 空 = 不过滤(与收口前行为一致)。默认 = 仿真试点三库,九产品线旧演示库不再进问数。
-    scene-ds: DS_HIS_INP,DS_MEDREC,DS_SETTLE
+  proposal:
+    cron: "-"
 
-# 知识双轨（借鉴 5）：文档切分与本地向量化。文档向量服务未启动 = 向量路自动关闭，纯关键词照常。
 knowledge:
   chunk:
     size: 500

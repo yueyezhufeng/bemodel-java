@@ -3,9 +3,6 @@ package com.bemodel.ontology;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.bemodel.common.BizException;
 import com.bemodel.common.PageResult;
-import com.bemodel.cs.ClarifyService;
-import com.bemodel.cs.ClarifyTask;
-import com.bemodel.cs.mapper.ClarifyTaskMapper;
 import com.bemodel.datasource.service.MappingService;
 import com.bemodel.datasource.entity.Mapping;
 import com.bemodel.instance.InstanceService;
@@ -35,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * H1 编辑字段白名单（状态/版本/负责人/编码不可越权改写）；
  * H2 未发布概念直达废弃（版本不虚增）+ 已发布废弃维持评审门禁 + 撤销采纳直达废弃；
  * H3 废弃联动在线世界（ACTIVE 映射幂等告警、搜索隔离且不回流 miss、实例投影显式拒绝）；
- * 澄清任务列表（维护者可见性：排序与过滤）。
+ * 工业元数据保留维护与留痕边界。
  */
 @SpringBootTest
 class MaintenanceGovernanceTest {
@@ -58,10 +55,6 @@ class MaintenanceGovernanceTest {
     private InstanceService instanceService;
     @Autowired
     private NoticeService noticeService;
-    @Autowired
-    private ClarifyService clarifyService;
-    @Autowired
-    private ClarifyTaskMapper clarifyTaskMapper;
 
     @AfterEach
     void cleanup() {
@@ -74,8 +67,6 @@ class MaintenanceGovernanceTest {
                 .likeRight(AlertNotice::getMetricCode, "CONCEPT_DEPRECATED:TEST_MAINT"));
         missMapper.delete(new LambdaQueryWrapper<OntologyMiss>()
                 .likeRight(OntologyMiss::getTerm, "维护治理"));
-        clarifyTaskMapper.delete(new LambdaQueryWrapper<ClarifyTask>()
-                .likeRight(ClarifyTask::getOriginQuestion, "维护治理"));
     }
 
     private static void loginAs(String role) {
@@ -248,28 +239,7 @@ class MaintenanceGovernanceTest {
 
     // ---------- 澄清任务列表（维护者可见性） ----------
 
-    @Test
-    void 澄清任务列表_排序与过滤() {
-        ClarifyTask t1 = clarifyService.createTask("ANALYTICS", "维护治理测试澄清A", "统计对象不明确", "AMBIGUITY");
-        ClarifyTask t2 = clarifyService.createTask("ANALYTICS", "维护治理测试澄清B", "时间范围不明确", "AMBIGUITY");
-        t2.setStatus("GAVE_UP");
-        t2.setClosedAt(java.time.LocalDateTime.now());
-        clarifyTaskMapper.updateById(t2);
 
-        PageResult<ClarifyTask> all = clarifyService.page(null, 1, 50);
-        List<Long> ids = all.getList().stream().map(ClarifyTask::getId).toList();
-        assertTrue(ids.contains(t1.getId()) && ids.contains(t2.getId()));
-        assertTrue(ids.indexOf(t1.getId()) < ids.indexOf(t2.getId()),
-                "PENDING 应排在 GAVE_UP 之前（FIELD 定序）: " + ids);
-
-        PageResult<ClarifyTask> gaveUp = clarifyService.page("gave_up", 1, 50);
-        List<Long> gaveUpIds = gaveUp.getList().stream().map(ClarifyTask::getId).toList();
-        assertTrue(gaveUpIds.contains(t2.getId()), "小写 status 应归一化后过滤");
-        assertFalse(gaveUpIds.contains(t1.getId()));
-
-        PageResult<ClarifyTask> pending = clarifyService.page("PENDING", 1, 50);
-        assertTrue(pending.getList().stream().anyMatch(t -> t.getId().equals(t1.getId())));
-    }
 
     // ---------- helpers ----------
 

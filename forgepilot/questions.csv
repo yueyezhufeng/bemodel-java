@@ -1,0 +1,11 @@
+﻿id,question,domain,entities,rules,data_status,business_acceptance
+CQ01,当前需求为什么缺料，实际合格可用是多少？,plan,"['Demand', 'Lot', 'Reservation', 'EvidenceVersion', 'ReleaseDecision']","['R01', 'R02', 'R03', 'R06']",现有演示业务可核对,pending
+CQ02,哪些供方可补缺口，费用和交付条件是什么？,source,"['Inquiry', 'Offer', 'Commitment', 'ApprovedSource']","['R05', 'R07']",现有演示业务可核对,pending
+CQ03,某批材料能否用于当前需求，证据覆盖是否重复使用？,quality,"['Evidence', 'EvidenceVersion', 'SourceVerification', 'ReleaseDecision']","['R01', 'R03']",现有演示业务可核对,pending
+CQ04,短收、改期、撤证对当前齐套和旧承诺有什么影响？,inbound,"['GoodsReceipt', 'Commitment', 'Reservation', 'Demand']","['R01', 'R04', 'R05']",现有演示业务可核对,pending
+CQ05,工程变更影响哪些工单、组件与已下采购？,make,"['BomRevision', 'BomLine', 'ProductionOrder', 'MaterialRequirement', 'PurchaseOrderLine']","['R08', 'R09']",待PLM/MES/ERP数据接入,pending
+CQ06,成品涉及哪些原料批次、检验及客户交付？,make,"['LotGenealogy', 'MaterialIssue', 'ProductionReport', 'Lot', 'Delivery']","['R03', 'R10']",待MES/TMS数据接入,pending
+CQ07,订单是否实际交付并被客户验收？,deliver,"['CustomerOrderLine', 'Delivery', 'CustomerAcceptance']",['R12'],待ERP/TMS/客户回执接入,pending
+CQ08,采购、发票和付款是否一致，未分配差额是多少？,finance,"['PurchaseOrderLine', 'Invoice', 'InvoiceAllocation', 'Payment', 'PaymentAllocation']","['R07', 'R11']",待财务数据接入,pending
+CQ09,受限余料谁负责，何时授权、执行和结案？,service,"['Disposition', 'Lot', 'ActionReceipt']",['R13'],现有演示业务可核对,pending
+CQ10,哪版模型、快照和证据支撑了当前决策？,govern,"['DecisionRecord', 'ModelRelease', 'ActionReceipt']",['R14'],动作回执已有；模型发布与决策记录待接入,pending

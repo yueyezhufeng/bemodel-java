@@ -27,6 +27,7 @@ public class RuleController {
 
     @PutMapping
     public Result<Rule> update(@RequestBody Rule rule) {
+        RuleService.requireContract(rule);
         ruleService.updateById(rule);
         return Result.ok(rule);
     }

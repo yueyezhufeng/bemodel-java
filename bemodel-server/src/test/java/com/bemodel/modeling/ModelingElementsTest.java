@@ -55,7 +55,7 @@ class ModelingElementsTest {
     @Test
     void rulesAndActionsSeeded() {
         List<Rule> rules = ruleService.list("");
-        assertEquals(14, rules.size(), "应预置14条业务规则（6条治理+8条病案质控，V13新增过敏禁忌/剂量上限）");
+        assertEquals(14, rules.size(), "应预置14条业务规则（6条治理+8条来源质控，V13新增过敏禁忌/剂量上限）");
         assertTrue(rules.stream().anyMatch(r -> "CANCEL_NOT_REFUND".equals(r.getMetricCode())),
                 "取消医嘱不得计费规则应绑定可执行指标");
 
@@ -70,7 +70,7 @@ class ModelingElementsTest {
         Rule rule = new Rule();
         rule.setRuleCode("RULE-TEST-001");
         rule.setName("测试规则");
-        rule.setConceptCode("FEE_DETAIL");
+        rule.setConceptCode("Lot");
         rule.setRuleType("约束");
         rule.setExpression("测试表达式");
         ruleService.create(rule);
@@ -102,7 +102,7 @@ class ModelingElementsTest {
 
     @Test
     void instanceBrowserShouldProjectPhysicalRowsToConceptAttrs() {
-        Map<String, Object> result = instanceService.instances("FEE_DETAIL", null, 1, 10);
+        Map<String, Object> result = instanceService.instances("Lot", null, 1, 10);
         List<Map<String, Object>> sources = (List<Map<String, Object>>) result.get("sources");
         assertFalse(sources.isEmpty());
         Map<String, Object> first = sources.get(0);

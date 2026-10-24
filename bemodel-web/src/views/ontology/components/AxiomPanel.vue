@@ -3,7 +3,7 @@
     <el-alert
       type="info"
       :closable="false"
-      title="公理是本体要素间的形式化约束，是病案质控、危重症预警等结论的证据溯源依据"
+      title="公理定义工业对象与关系的形式化约束，为批次来源、质量放行与履约规则提供可追溯依据"
       style="margin-bottom: 12px"
     />
     <div class="filter-bar">
@@ -40,7 +40,7 @@
           <el-input v-model="form.axiomCode" placeholder="如 AX-007" />
         </el-form-item>
         <el-form-item label="主语" required>
-          <el-input v-model="form.subject" placeholder="如 检验报告（危急值）" />
+          <el-input v-model="form.subject" placeholder="如 批次来源核验" />
         </el-form-item>
         <el-form-item label="谓词" required>
           <el-select v-model="form.predicate" style="width: 100%">
@@ -48,7 +48,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="宾语" required>
-          <el-input v-model="form.object" placeholder="如 诊断" />
+          <el-input v-model="form.object" placeholder="如 授权放行" />
         </el-form-item>
         <el-form-item label="类型">
           <el-select v-model="form.axiomType" style="width: 100%">

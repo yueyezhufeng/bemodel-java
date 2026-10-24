@@ -32,7 +32,7 @@
             <el-card>
               <template #header>
                 <div class="card-header">
-                  <span>概念列表{{ selectedDomain ? `（${selectedDomain}）` : '' }}</span>
+                  <span>概念{{ modelingView === 'graph' ? '关系图' : '列表' }}{{ selectedDomain ? `（${selectedDomain}）` : '' }}</span>
                   <div>
                     <el-badge
                       :value="missData.pendingCount"
@@ -53,11 +53,23 @@
                   </div>
                 </div>
               </template>
-              <el-table
+              <div class="model-view-toolbar">
+                <el-radio-group v-model="modelingView" size="small"><el-radio-button value="graph">关系图</el-radio-button><el-radio-button value="list">概念列表</el-radio-button></el-radio-group>
+                <el-select :model-value="detail.concept?.code || ''" filterable placeholder="定位概念 / 闭包查询" style="width:220px" size="small" @change="code => code && openDetail({code})"><el-option v-for="c in concepts" :key="c.code" :label="`${c.name}（${c.code}）`" :value="c.code" /></el-select>
+                <span>{{ modelGraph.nodes.length }} 个概念 · {{ modelGraph.edges.length }} 条关系（含跨域邻居）</span>
+                <el-button size="small" :loading="loadingGraph" @click="loadOverview(true)">刷新图示</el-button>
+              </div>
+              <el-alert v-if="graphError" :title="graphError" type="error" :closable="false" />
+              <div v-if="modelingView === 'graph'" v-loading="loadingGraph">
+                <GraphCanvas v-if="modelGraph.nodes.length" :nodes="modelGraph.nodes" :edges="modelGraph.edges" :categories="modelGraph.categories" layout="force" :initial-zoom="0.6" height="540px" @node-click="onGraphNodeClick" />
+                <el-empty v-else-if="!loadingGraph && !graphError" description="此业务域暂无概念" />
+                <p class="graph-legend-tip">点击节点打开概念图及闭包 / 路径查询；滚轮缩放、拖动平移。图示读取当前工作模型，不代表正式发布。</p>
+              </div>
+              <el-table v-else
                 :data="pagedConcepts"
                 v-loading="loadingConcepts"
                 highlight-current-row
-                @row-click="openDetail"
+                @row-click="row => openDetail(row)"
               >
                 <el-table-column prop="code" label="编码" width="160" />
                 <el-table-column prop="name" label="名称" width="130" />
@@ -71,7 +83,7 @@
                 <el-table-column prop="definition" label="定义" show-overflow-tooltip />
               </el-table>
               <el-pagination
-                v-if="concepts.length > 0"
+                v-if="modelingView === 'list' && concepts.length > 0"
                 class="concept-pager"
                 small
                 layout="total, prev, pager, next"
@@ -179,7 +191,9 @@
               </el-table>
               <el-empty v-if="!(detail.parents || []).length" description="暂无父概念" :image-size="60" />
             </el-tab-pane>
-            <el-tab-pane label="图" name="graph">
+            <el-tab-pane label="图 / 闭包查询" name="graph">
+              <el-button size="small" :loading="loadingGraph" @click="loadOverview(true)">刷新图示</el-button>
+              <el-alert v-if="graphError" :title="graphError" type="error" :closable="false" />
               <div v-if="graphNodes.length" class="graph-pane">
                 <GraphCanvas
                   :nodes="graphNodes"
@@ -187,6 +201,7 @@
                   :categories="graphCategories"
                   layout="force"
                   height="460px"
+                  :initial-zoom="0.8"
                   :loading="loadingGraph"
                   :tooltip-formatter="graphTooltip"
                   @node-click="onGraphNodeClick"
@@ -202,20 +217,26 @@
                   <span class="gl-item">点击相邻节点切换概念</span>
                 </div>
               </div>
-              <el-empty v-else description="暂无相邻关系或互斥公理" :image-size="60" />
+              <el-empty v-else description="当前概念尚无相邻关系" :image-size="60" />
 
-              <el-divider content-position="left">传递闭包</el-divider>
+              <el-divider content-position="left">传递闭包 / 关系路径</el-divider>
+              <div class="closure-tool">
+                <el-radio-group v-model="closureMode" size="small"><el-radio-button value="closure">传递闭包</el-radio-button><el-radio-button value="paths">关系路径</el-radio-button></el-radio-group>
+                <el-select v-model="closureSource" size="small" style="width:160px"><el-option label="当前模型只读预览" value="working" /><el-option label="发布闭包缓存" value="published" :disabled="closureMode === 'paths'" /></el-select>
+                <el-select v-model="closureDirection" size="small" style="width:130px" :disabled="closureSource === 'published'"><el-option label="沿出边" value="outgoing" /><el-option label="沿入边反查" value="incoming" /></el-select>
+              </div>
+              <el-alert :closable="false" type="info" :title="closureMode === 'paths' ? '关系路径仅展示当前模型的结构可达性，不推导传递事实，也不发布或修改模型。' : '传递闭包仅适用于已声明传递公理的关系；当前模型预览无需发布。发布缓存可能尚未生成。'" style="margin:12px 0" />
               <div class="closure-tool">
                 <el-select
                   v-model="closureRelation"
-                  placeholder="选择传递关系"
+                  placeholder="选择关系"
                   style="width: 220px"
                   size="small"
                 >
                   <el-option
-                    v-for="name in transitiveRelations"
+                    v-for="name in relationOptions"
                     :key="name"
-                    :label="name"
+                    :label="name === '*' ? '全部关系（仅结构路径）' : name"
                     :value="name"
                   />
                 </el-select>
@@ -227,14 +248,15 @@
                   :loading="loadingClosure"
                   @click="runClosure"
                 >查询可达概念</el-button>
-                <span v-if="!transitiveRelations.length" class="closure-tip">
-                  当前概念没有声明「传递」公理的关系
+                <span v-if="closureMode === 'closure' && !transitiveRelations.length" class="closure-tip">
+                  当前模型尚未声明传递关系，可切换「关系路径」查询
                 </span>
               </div>
               <template v-if="closureResult">
+                <p class="closure-tip">{{ closureSource === 'working' ? '当前模型只读预览' : '发布闭包缓存' }} · {{ closureMode === 'paths' ? '结构路径' : '传递可达' }} · {{ closureResult.count }} 个概念<span v-if="closureResult.capped"> · 已到深度上限 {{ closureResult.maxDepth }}，结果截断</span></p>
                 <div v-if="closureResult.count > 0" class="closure-result">
                   <div
-                    v-for="depth in Object.keys(closureLayers).sort()"
+                    v-for="depth in Object.keys(closureLayers).sort((a,b) => Number(a)-Number(b))"
                     :key="depth"
                     class="closure-layer"
                   >
@@ -252,7 +274,7 @@
                   v-else
                   type="info"
                   :closable="false"
-                  title="该概念在此关系上无传递可达"
+                  :title="closureSource === 'published' ? '未查到发布缓存；可切换当前模型预览。' : '当前方向无可达概念，可切换关系或沿入边反查。'"
                 />
               </template>
             </el-tab-pane>
@@ -368,7 +390,7 @@
             <el-form-item label="编码" required>
               <el-input
                 v-model="conceptForm.code"
-                placeholder="如 FEE_DETAIL"
+                placeholder="如 Lot"
                 :disabled="conceptDialogMode === 'edit'"
               />
             </el-form-item>
@@ -593,7 +615,7 @@
                 v-model="disjointForm.definition"
                 type="textarea"
                 :rows="3"
-                placeholder="如：男性患者不允许出现妊娠类诊断"
+                placeholder="如：待检批次不得同时认定为已授权放行"
               />
             </el-form-item>
           </el-form>
@@ -945,11 +967,13 @@ import {
   addParent,
   removeParent,
   setPrimaryParent,
-  relationClosure
+  relationClosure,
+  ontologyGraph,
+  previewRelation
 } from '../../api/ontology'
-import { getArchitectureOverview } from '../../api/architecture'
+import { buildOntologyGraph, escapeGraphText } from '../../utils/ontologyGraph.mjs'
 import { statusText, statusTagType } from '../../utils/dict'
-import { axiomSuffixOf, axiomStyleOf, axiomTooltipOf } from '../../utils/axiomEdge'
+import { axiomSuffixOf, axiomTooltipOf } from '../../utils/axiomEdge'
 import { useConceptStore } from '../../store/concept'
 import { useUserStore } from '../../store/user'
 import GraphCanvas from '../../components/GraphCanvas.vue'
@@ -1035,6 +1059,7 @@ const loadConcepts = async () => {
   try {
     concepts.value = await listConcepts(selectedDomain.value || undefined)
     conceptPage.value = 1
+    await loadOverview(true)
   } finally {
     loadingConcepts.value = false
   }
@@ -1042,21 +1067,27 @@ const loadConcepts = async () => {
 
 // ---------- 概念详情 ----------
 const drawerVisible = ref(false)
-const activeInnerTab = ref('attrs')
+const activeInnerTab = ref('graph')
 const detail = ref({ concept: null, attributes: [], relations: [], terms: [] })
 const transitioning = ref(false)
 
-const openDetail = async (row, innerTab = 'attrs') => {
-  detail.value = await conceptDetail(row.code)
+let detailRequest = 0
+const openDetail = async (row, innerTab = 'graph') => {
+  const request = ++detailRequest
+  const next = await conceptDetail(row.code)
+  if (request !== detailRequest) return
+  detail.value = next
   activeInnerTab.value = innerTab
   drawerVisible.value = true
   closureRelation.value = ''
   closureResult.value = null
   loadDisjoint()
+  loadOverview(true)
 }
 
 const refreshDetail = async () => {
   detail.value = await conceptDetail(detail.value.concept.code)
+  await Promise.all([loadOverview(true), conceptStore.fetchAll(true)])
 }
 
 const doTransition = async (target) => {
@@ -1335,124 +1366,77 @@ const doRemoveParent = async (row) => {
 }
 
 // ---------- 传递闭包（图 tab 小工具） ----------
+const overviewData = ref(null)
+const loadingGraph = ref(false)
+const graphError = ref('')
 const closureRelation = ref('')
 const loadingClosure = ref(false)
 const closureResult = ref(null)
 
-// 可选关系：当前概念声明了传递公理的关系名
-const transitiveRelations = computed(() => [
-  ...new Set(
-    (detail.value.relations || []).filter((r) => r.isTransitive === 1).map((r) => r.relationName)
-  )
-])
-
+const closureMode = ref('paths')
+const closureDirection = ref('outgoing')
+const closureSource = ref('working')
+let closureRequest = 0
+const transitiveRelations = computed(() => [...new Set((overviewData.value?.relations || [])
+  .filter(r => r.isTransitive === 1 || r.isTransitive === true).map(r => r.relationName))].sort())
+const relationOptions = computed(() => closureMode.value === 'paths'
+  ? ['*', ...new Set((overviewData.value?.relations || []).map(r => r.relationName))].sort((a,b) => a==='*'?-1:b==='*'?1:a.localeCompare(b))
+  : transitiveRelations.value)
 const closureLayers = computed(() => {
   const layers = {}
-  for (const r of closureResult.value?.reachable || []) {
-    ;(layers[r.depth] ||= []).push(r.concept)
-  }
+  for (const r of closureResult.value?.reachable || []) (layers[r.depth] ||= []).push(r.concept)
   return layers
 })
-
-const runClosure = async () => {
-  loadingClosure.value = true
-  try {
-    closureResult.value = await relationClosure(
-      closureRelation.value,
-      detail.value.concept.code
-    )
-  } finally {
-    loadingClosure.value = false
-  }
-}
-
-// ---------- 邻域图（「图」tab）----------
-const overviewData = ref(null)
-const loadingGraph = ref(false)
-
-const loadOverview = async () => {
-  if (overviewData.value) return
-  loadingGraph.value = true
-  try {
-    overviewData.value = await getArchitectureOverview()
-  } catch {
-    overviewData.value = { nodes: [], edges: [] }
-  } finally {
-    loadingGraph.value = false
-  }
-}
-
-const graphCategories = [
-  { name: '当前概念', itemStyle: { color: '#409eff' } },
-  { name: '相邻概念', itemStyle: { color: '#67c23a' } }
-]
-
-// 以当前概念为中心：RELATION 关系邻边 + 互斥（disjoint）红虚线边
-const neighborhood = computed(() => {
-  const code = detail.value.concept?.code
-  const overview = overviewData.value
-  if (!code || !overview) return { nodes: [], edges: [] }
-  const cid = `C:${code}`
-  const nameOf = (c) =>
-    (overview.nodes || []).find((n) => n.id === `C:${c}`)?.name || c
-  const nodeIds = new Set([cid])
-  const edges = []
-  for (const e of overview.edges || []) {
-    if (e.kind !== 'RELATION') continue
-    if (e.source !== cid && e.target !== cid) continue
-    nodeIds.add(e.source)
-    nodeIds.add(e.target)
-    const style = axiomStyleOf(e, '#95d475', { width: 1.5, curveness: 0.12 })
-    edges.push({
-      source: e.source,
-      target: e.target,
-      label: { show: true, formatter: (e.label || '') + axiomSuffixOf(e), fontSize: 11, color: '#909399' },
-      ...style,
-      _raw: e
-    })
-  }
-  for (const d of disjointPairs.value) {
-    if (d.conceptACode !== code && d.conceptBCode !== code) continue
-    const other = d.conceptACode === code ? d.conceptBCode : d.conceptACode
-    const oid = `C:${other}`
-    nodeIds.add(oid)
-    edges.push({
-      source: cid,
-      target: oid,
-      label: { show: true, formatter: '互斥', fontSize: 11, color: '#f56c6c' },
-      lineStyle: { color: '#f56c6c', width: 1.5, type: 'dashed', curveness: 0 },
-      symbol: ['none', 'none']
-    })
-  }
-  const nodes = [...nodeIds].map((id) => {
-    const c = id.slice(2)
-    return {
-      id,
-      name: nameOf(c),
-      category: id === cid ? '当前概念' : '相邻概念',
-      symbolSize: id === cid ? 30 : 20,
-      _code: c
-    }
-  })
-  return { nodes, edges }
+watch([() => detail.value.concept?.code, closureMode, closureDirection, closureSource, relationOptions], () => {
+  closureRequest++;closureResult.value = null
+  if (!relationOptions.value.includes(closureRelation.value)) closureRelation.value = relationOptions.value[0] || ''
 })
+watch(closureRelation, () => { closureRequest++;closureResult.value = null })
+watch(closureSource, source => { if(source === 'published') closureDirection.value = 'outgoing' })
+watch(closureMode, mode => { if(mode === 'paths') {closureSource.value='working';closureDirection.value='outgoing'} })
+const runClosure = async () => {
+  const request=++closureRequest
+  closureResult.value=null;loadingClosure.value=true
+  try {
+    const result=closureSource.value==='published'
+      ? await relationClosure(closureRelation.value,detail.value.concept.code)
+      : await previewRelation(closureRelation.value,detail.value.concept.code,closureMode.value,closureDirection.value)
+    if(request===closureRequest) closureResult.value=result
+  } finally { loadingClosure.value=false }
+}
+
+// Model-only graph: independent from the hospital architecture engine.
+const modelingView = ref('graph')
+let overviewRequest = 0
+const loadOverview = async (force=false) => {
+  if(overviewData.value && !force) return
+  const request=++overviewRequest;loadingGraph.value=true;graphError.value=''
+  try {const model=await ontologyGraph();if(request===overviewRequest)overviewData.value=model}
+  catch {if(request===overviewRequest)graphError.value='模型关系图加载失败，请重试。'}
+  finally {if(request===overviewRequest)loadingGraph.value=false}
+}
+const modelGraph = computed(() => buildOntologyGraph(overviewData.value || {}, {domain:selectedDomain.value}))
+const neighborhood = computed(() => buildOntologyGraph(overviewData.value || {}, {
+  center:detail.value.concept?.code || '',disjoint:disjointPairs.value
+}))
 const graphNodes = computed(() => neighborhood.value.nodes)
 const graphEdges = computed(() => neighborhood.value.edges)
+const graphCategories = computed(() => neighborhood.value.categories)
 
 // 边 tooltip：关系名+公理尾缀+逐条人话解释（spec §4）
 const graphTooltip = (p) => {
   if (p.dataType === 'edge') {
     const e = p.data._raw
     if (!e) return '互斥' // 互斥边无 _raw，label 是对象不能直接回显
-    const lines = [`<b>${e.label || ''}</b>${axiomSuffixOf(e)}`]
-    for (const l of axiomTooltipOf(e)) lines.push(`<br/>${l}`)
+    const lines = [`<b>${escapeGraphText(e.label)}</b>${escapeGraphText(axiomSuffixOf(e))}`]
+    for (const l of axiomTooltipOf(e)) lines.push(`<br/>${escapeGraphText(l)}`)
     return lines.join('')
   }
-  return p.data.name || ''
+  return escapeGraphText(p.data.name)
 }
 
 const onGraphNodeClick = async (node) => {
-  if (!node._code || node._code === detail.value.concept?.code) return
+  if (!node._code || (drawerVisible.value && node._code === detail.value.concept?.code)) return
   await openDetail({ code: node._code }, 'graph')
 }
 
@@ -1813,6 +1797,8 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.model-view-toolbar {display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px;font-size:12px;color:#73746e}
+.closure-tool {flex-wrap:wrap;row-gap:10px}
 .workbench-tabs :deep(.el-tabs__header) {
   margin-bottom: 16px;
 }

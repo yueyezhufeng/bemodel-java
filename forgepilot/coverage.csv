@@ -1,0 +1,46 @@
+﻿entity,name,source,mapped_attributes,total_attributes,status,owner,next_step
+Party,业务主体,parties,3,3,adapter_defined_not_production,主数据管理员,按源快照验证字段、主键、时间、状态与组织权限
+Site,工厂与场地,MDM / PLM,0,4,source_contract_pending,主数据管理员,取得源字典与只读样本，由owner确认后实现适配器
+Material,物料,MDM / PLM,0,5,source_contract_pending,主数据管理员,取得源字典与只读样本，由owner确认后实现适配器
+UomConversion,单位换算,MDM / PLM,0,7,source_contract_pending,主数据管理员,取得源字典与只读样本，由owner确认后实现适配器
+BomRevision,BOM版本,MDM / PLM,0,5,source_contract_pending,主数据管理员,取得源字典与只读样本，由owner确认后实现适配器
+BomLine,BOM行,MDM / PLM,0,6,source_contract_pending,主数据管理员,取得源字典与只读样本，由owner确认后实现适配器
+Equipment,设备与产线,MDM / PLM,0,5,source_contract_pending,主数据管理员,取得源字典与只读样本，由owner确认后实现适配器
+CustomerOrderLine,客户订单行,ERP / APS,0,7,source_contract_pending,销售 / PMC,取得源字典与只读样本，由owner确认后实现适配器
+Demand,材料需求行,demands,8,8,adapter_defined_not_production,销售 / PMC,按源快照验证字段、主键、时间、状态与组织权限
+ProductionOrder,生产工单,ERP / APS,0,7,source_contract_pending,销售 / PMC,取得源字典与只读样本，由owner确认后实现适配器
+MaterialRequirement,工单用料需求,ERP / APS,0,6,source_contract_pending,销售 / PMC,取得源字典与只读样本，由owner确认后实现适配器
+SupplierQualification,供应商资格,SRM / ERP,0,6,source_contract_pending,采购负责人,取得源字典与只读样本，由owner确认后实现适配器
+SourceRequirement,来源要求,source_requirements,7,7,adapter_defined_not_production,采购负责人,按源快照验证字段、主键、时间、状态与组织权限
+ApprovedSource,批准来源,approved_sources,7,7,adapter_defined_not_production,采购负责人,按源快照验证字段、主键、时间、状态与组织权限
+Inquiry,询价与追证请求,requests,6,6,adapter_defined_not_production,采购负责人,按源快照验证字段、主键、时间、状态与组织权限
+Offer,供货报价,offers,10,10,adapter_defined_not_production,采购负责人,按源快照验证字段、主键、时间、状态与组织权限
+SupplierReply,供方回复,supplier_replies,6,6,adapter_defined_not_production,采购负责人,按源快照验证字段、主键、时间、状态与组织权限
+Commitment,双方供货承诺,state.commitment,5,5,adapter_defined_not_production,采购负责人,按源快照验证字段、主键、时间、状态与组织权限
+Shipment,供方发运,WMS / TMS,0,6,source_contract_pending,仓库负责人,取得源字典与只读样本，由owner确认后实现适配器
+GoodsReceipt,到货接收回执,receipts:goods_receipt,7,7,adapter_defined_not_production,仓库负责人,按源快照验证字段、主键、时间、状态与组织权限
+Lot,库存批次,lots,12,12,adapter_defined_not_production,仓库负责人,按源快照验证字段、主键、时间、状态与组织权限
+Reservation,库存预留,reservations,7,7,adapter_defined_not_production,仓库负责人,按源快照验证字段、主键、时间、状态与组织权限
+Evidence,证据记录,evidence,8,8,adapter_defined_not_production,质量负责人,按源快照验证字段、主键、时间、状态与组织权限
+EvidenceVersion,证据版本,evidence.versions,7,7,adapter_defined_not_production,质量负责人,按源快照验证字段、主键、时间、状态与组织权限
+Inspection,性能检验回执,receipts:inspection,6,6,adapter_defined_not_production,质量负责人,按源快照验证字段、主键、时间、状态与组织权限
+SourceVerification,来源核验回执,receipts:source_verification,7,7,adapter_defined_not_production,质量负责人,按源快照验证字段、主键、时间、状态与组织权限
+ReleaseDecision,授权放行回执,receipts:release,7,7,adapter_defined_not_production,质量负责人,按源快照验证字段、主键、时间、状态与组织权限
+MaterialIssue,生产领料,MES,0,6,source_contract_pending,生产负责人,取得源字典与只读样本，由owner确认后实现适配器
+ProductionReport,生产报工,MES,0,7,source_contract_pending,生产负责人,取得源字典与只读样本，由owner确认后实现适配器
+LotGenealogy,批次谱系分配,MES,0,6,source_contract_pending,生产负责人,取得源字典与只读样本，由owner确认后实现适配器
+Nonconformance,不合格事项,MES,0,6,source_contract_pending,生产负责人,取得源字典与只读样本，由owner确认后实现适配器
+Delivery,客户发运交付,TMS / ERP,0,6,source_contract_pending,物流负责人,取得源字典与只读样本，由owner确认后实现适配器
+CustomerAcceptance,客户签收验收,TMS / ERP,0,6,source_contract_pending,物流负责人,取得源字典与只读样本，由owner确认后实现适配器
+PurchaseOrderLine,采购订单行,ERP / 财务,0,8,source_contract_pending,财务负责人,取得源字典与只读样本，由owner确认后实现适配器
+Invoice,供应商发票,ERP / 财务,0,6,source_contract_pending,财务负责人,取得源字典与只读样本，由owner确认后实现适配器
+InvoiceAllocation,发票采购分配,ERP / 财务,0,5,source_contract_pending,财务负责人,取得源字典与只读样本，由owner确认后实现适配器
+Payment,付款事件,ERP / 财务,0,6,source_contract_pending,财务负责人,取得源字典与只读样本，由owner确认后实现适配器
+PaymentAllocation,付款发票分配,ERP / 财务,0,5,source_contract_pending,财务负责人,取得源字典与只读样本，由owner确认后实现适配器
+ProcurementSettlement,采购结清,ERP / 财务,0,6,source_contract_pending,财务负责人,取得源字典与只读样本，由owner确认后实现适配器
+ReturnOrder,退供与退货单,CRM / QMS / WMS,0,6,source_contract_pending,售后 / 质量,取得源字典与只读样本，由owner确认后实现适配器
+Disposition,余料与异常处置,state.remainders,6,6,adapter_defined_not_production,售后 / 质量,按源快照验证字段、主键、时间、状态与组织权限
+ServiceCase,售后与质量索赔,CRM / QMS / WMS,0,6,source_contract_pending,售后 / 质量,取得源字典与只读样本，由owner确认后实现适配器
+ActionReceipt,业务动作回执,receipts,7,7,adapter_defined_not_production,业务审核人 / 模型管理员,按源快照验证字段、主键、时间、状态与组织权限
+DecisionRecord,决策记录,ForgePilot,0,6,source_contract_pending,业务审核人 / 模型管理员,取得源字典与只读样本，由owner确认后实现适配器
+ModelRelease,模型发布,ForgePilot,0,6,source_contract_pending,业务审核人 / 模型管理员,取得源字典与只读样本，由owner确认后实现适配器

@@ -68,7 +68,7 @@ class MappingPromptPruneTest {
 
     @Test
     void 拆词_整体加拆词_单字符词剔除() {
-        assertEquals(List.of("inp_visit", "inp", "visit"), MappingService.splitSnake("INP_VISIT"));
+        assertEquals(List.of("inp_visit", "inp", "visit"), MappingService.splitSnake("Demand"));
         assertEquals(List.of("a_b"), MappingService.splitSnake("A_B"), "单字符拆词不入针集（误命中噪声）");
         assertTrue(MappingService.splitSnake(null).isEmpty());
         assertTrue(MappingService.splitSnake("  ").isEmpty());
@@ -81,12 +81,12 @@ class MappingPromptPruneTest {
         List<Concept> concepts = List.of(
                 concept("VISIT", "就诊"),
                 concept("DRUG", "药品"),
-                concept("PATIENT", "患者"));
+                concept("PATIENT", "联系人"));
         List<Attribute> attrs = List.of(
                 attr("VISIT", "visit_id", "就诊流水号"),
-                attr("PATIENT", "patient_id", "患者编号"));
+                attr("PATIENT", "patient_id", "联系人编号"));
         List<PhysicalColumn> columns = List.of(
-                col("patient_id", "患者编号"),
+                col("patient_id", "联系人编号"),
                 col("visit_sn", "就诊流水"));
         // DRUG 零分剔除；PATIENT 命中率 4/4=1.0 高于 VISIT 2/4=0.5。k 必须小于概念数才走计分路径
         List<Concept> picked = MappingService.topKConcepts(concepts, attrs, List.of(), columns, 2);

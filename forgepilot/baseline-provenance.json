@@ -1,0 +1,227 @@
+[
+  {
+    "file": "V1__platform.sql",
+    "sha256": "82efc925ed6046283d127e18e7f193d22026ace18257f0da20e346b3485b262c",
+    "ddl_statements": 14
+  },
+  {
+    "file": "V2__demo_products.sql",
+    "sha256": "4837aa3245f97ef9066b3de69f42f195fff218c4d65fefba42b586c30e6aeb69",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V3__seed_ontology.sql",
+    "sha256": "2acf127166020c24e7ba0b63cca7eff15396a33a7ee1a9505fc3a0acd9210907",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V4__metric_monitor.sql",
+    "sha256": "d5e688b95911bca4408c1208ec4b60b656be915131f3deb0606a8d42be26345c",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V5__flow_closed_loop.sql",
+    "sha256": "a52259813b30b22d505bcc147cdf4e314e69861de0a022c247c43699f0512c5c",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V6__outpatient.sql",
+    "sha256": "7d7aacbe8ab9b09a992fbf775cf07c7381b3a20d983538a5d570469f7e98143d",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V7__modeling_elements.sql",
+    "sha256": "f092ace7c9c909c2b75579a9493ba9b45633a565f4005fa5b83fe795a772e514",
+    "ddl_statements": 4
+  },
+  {
+    "file": "V8__clinical_semantic_base.sql",
+    "sha256": "69defe542a483f22e55e26f724f0dcb5866c123a9304f51c8ebf2270d324c151",
+    "ddl_statements": 2
+  },
+  {
+    "file": "V9__rule_engine_pacs.sql",
+    "sha256": "c3a20e072b0835bfb016b6c8c84b66cbc80b3a260f17ff695d003e65b4b10657",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V10__nurse_station.sql",
+    "sha256": "daf2acf0ef79ee631ddc3a684f3213c920e396622cede322b66545573e766718",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V11__prescription_knowledge.sql",
+    "sha256": "4b7976e996c82a4420b0bbbb9ccbbb043f6343f51a1e588c3456f9ddc685fe93",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V12__business_expansion.sql",
+    "sha256": "d7249d6869bb9bbbc2dc3c2881ed6bc66366c1888df51a96958aa2ba79f639d4",
+    "ddl_statements": 3
+  },
+  {
+    "file": "V13__prescription_dual_engine.sql",
+    "sha256": "3be9fecfb6885717fa65d7a697371496d48702806ddc466a614dbe211ad7d584",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V14__domain_expansion.sql",
+    "sha256": "24ef0dbcc76db3a888ede5497194e855b896d705873f92b9efd2b498395ef7b0",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V15__material_org_blood.sql",
+    "sha256": "90e796915f697dae2d8fc001ae01827d090d68a7e710c4bc102ff8ba1640b4a7",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V16__material_org_closed_loop.sql",
+    "sha256": "1fd460ea26f1e9cf07d6c8501c496006ee7d081b429e41f0052c882b9bd2734a",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V17__link_rel.sql",
+    "sha256": "b90a91f3886ccbf7e4e98071608e83aaa672539b20dfefe693895401a09cd8b6",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V18__link_trace_storylines.sql",
+    "sha256": "7badb66e3db0f7427826b5eb7263dedc4f2aa0758e7d1fcf51d6ebc460bdf950",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V19__structured_axioms.sql",
+    "sha256": "9d85a0b68dd3ea0c44c2005e735221bb3f04c9fa198cf499525c29a2e517b78d",
+    "ddl_statements": 3
+  },
+  {
+    "file": "V20__ontology_growth_loop.sql",
+    "sha256": "8dfaaa939c89d5415587e86f1921732db211e9198d986093e0488f69d1aff32a",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V21__miss_adopt_as_term.sql",
+    "sha256": "43040c172f59aca028f84ddc132a41d8c23fc21ec3ffe194d517b7f4f0301aad",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V22__qc_term_normalization_seeds.sql",
+    "sha256": "443af445373e6d0dca56e3253676412d5df7573ef9c75af350c10242e4826682",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V23__settlement_concept.sql",
+    "sha256": "425f3d85813b30e711bfe9f2846a89a0682aaea3be8ba65fd4b8be377668ab91",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V24__multi_parent_inheritance.sql",
+    "sha256": "b51610b7b8baa66171bd1d709261b11ed038f93e72568ed12f1d994640d1437a",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V25__relation_closure.sql",
+    "sha256": "a768e9df26d2a27f3de072e3cd4f5f81e1b7463fc33db23a4afc2edc1b8f71e0",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V26__auth_and_security.sql",
+    "sha256": "350c26d4c6094d5f183b4fe587bece54ff2484f99d3450b6029d1d1d439f58e0",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V27__inspect_notice.sql",
+    "sha256": "9c7f1725e3418b76253f13655f5f1e293096e48e55656d349689eb8e7856d3e5",
+    "ddl_statements": 2
+  },
+  {
+    "file": "V28__cs_feedback.sql",
+    "sha256": "5dc66172efe29ac8520ab0d46052916eeec2da269fa2c3da401d44e9edef4aa5",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V29__reviewer_role_and_release_approval.sql",
+    "sha256": "560a6ef01ca2086d0ace7f7e7d6199863856898a249f50d8648f55e00f6fbb05",
+    "ddl_statements": 2
+  },
+  {
+    "file": "V30__mapping_lifecycle.sql",
+    "sha256": "ea65ff1bb762a5fb4348870bb5fc98bf9bc8a5fc892c90812b963c9da762581a",
+    "ddl_statements": 2
+  },
+  {
+    "file": "V31__recon_diff.sql",
+    "sha256": "de3a7bd996b673988f800005ae410b23677193416cbe478bf037d134d7622619",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V32__clarify_task.sql",
+    "sha256": "2ea1ccb03f2502ea3251a4fa29de998dfb6d389565c3afbea789f0a1384c3769",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V33__qa_trace.sql",
+    "sha256": "28d7d36fab3ac3d05367986b1953edba7b6812e318225535cc77debef9d5504d",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V34__proposal_queue.sql",
+    "sha256": "f9079180612bd1a1b04e243833b0d40aa5328e1af49a7838eedfabd0d5eda10d",
+    "ddl_statements": 2
+  },
+  {
+    "file": "V35__lab_run.sql",
+    "sha256": "ea45f1ea0a8e72158b13f15338e4468cc36750da8e2c231366cc83b2e04d3e56",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V36__simulation_sandbox.sql",
+    "sha256": "8fb13a6098289fa419bd5a01f4bd6b2b8be31c3f3708c687713cb39b71dd08d8",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V37__axiom_positive_seeds.sql",
+    "sha256": "780e7c14de09e90b168a30c1ddf545dd55e685074a0e7737a50f480cd4b97be8",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V38__llm_log_provider.sql",
+    "sha256": "94864198811f3393700fc905fc675d3c83f582e37dbd1206aaccfb642654d57d",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V39__knowledge_documents.sql",
+    "sha256": "4c1efbbf837495ca4d611977bf971f5f5291d06ce37c065bb02caf3508257d0f",
+    "ddl_statements": 2
+  },
+  {
+    "file": "V40__knowledge_entries.sql",
+    "sha256": "fa0063b2f33c4326748acd3956b6878c799a2b6fde8dbf8fbdba166a24f42d97",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V41__knowledge_seeds.sql",
+    "sha256": "cd754f5921dd86b3373a705cfd2cd307cbb15a3cebc17eae6f6c70bd080e865e",
+    "ddl_statements": 0
+  },
+  {
+    "file": "V42__qa_trace_matched_docs.sql",
+    "sha256": "d5f784b6aed6ae00b4f2b6b031cdef17ccd0d47eabed001cb69115894602dca0",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V43__reconcile_group.sql",
+    "sha256": "bb95dc218d644b3050d81c8b48ee1185f2b1baa1a193ec02e5df37997ee468ab",
+    "ddl_statements": 2
+  },
+  {
+    "file": "V44__reconcile_dispute_flow.sql",
+    "sha256": "4f484532e1bbce422789cd61067686ac01daa12420b6690aefdd40c05d32d822",
+    "ddl_statements": 1
+  },
+  {
+    "file": "V45__platform_adjustments.sql",
+    "sha256": "542dd4f3020048fbb9b2245f85886cffa3e92198ddb9689a9810701c4342febd",
+    "ddl_statements": 3
+  }
+]

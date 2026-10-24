@@ -15,25 +15,12 @@
     <artifactId>bemodel-server</artifactId>
     <version>1.0.0</version>
     <name>bemodel-server</name>
-    <description>BeModel 医疗本体平台</description>
+    <description>ForgePilot 工业本体与接入管理</description>
 
     <properties>
         <java.version>21</java.version>
-        <!-- mcp-core 2.0.1 按 reactor-core 3.7.0 编译；Boot 3.3.4 BOM 默认管到 3.6.10，必须钉住 2024.0.0(=3.7.0) -->
-        <reactor-bom.version>2024.0.0</reactor-bom.version>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>io.modelcontextprotocol.sdk</groupId>
-                <artifactId>mcp-bom</artifactId>
-                <version>2.0.1</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -72,11 +59,6 @@
             <version>5.2.0</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.jena</groupId>
-            <artifactId>jena-shacl</artifactId>
-            <version>5.2.0</version>
-        </dependency>
-        <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>
             <version>2.9.2</version>
@@ -111,23 +93,6 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
-        </dependency>
-        <!-- MCP 官方 SDK;mcp 聚合包默认带 jackson3 绑定,其 tools.jackson 3.x 需要 jackson-annotations 3.x,
-             与 Boot 3.3 管理的 2.17.x 冲突(JsonSerializeAs NoClassDefFoundError,上下文起不来);
-             换官方 mcp-json-jackson2 绑定(同样走 mcp-bom 2.0.1,提供 McpJsonMapper+JsonSchemaValidator 两个 provider),databind 复用既有 Jackson 2 -->
-        <dependency>
-            <groupId>io.modelcontextprotocol.sdk</groupId>
-            <artifactId>mcp</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>io.modelcontextprotocol.sdk</groupId>
-                    <artifactId>mcp-json-jackson3</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>io.modelcontextprotocol.sdk</groupId>
-            <artifactId>mcp-json-jackson2</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

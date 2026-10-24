@@ -35,7 +35,7 @@ class ConceptServiceTest {
 
     @Test
     void conceptDetailShouldAggregateAttributesAndRelations() {
-        Map<String, Object> detail = conceptService.detail("FEE_DETAIL");
+        Map<String, Object> detail = conceptService.detail("Lot");
         Concept concept = (Concept) detail.get("concept");
         assertEquals("费用明细", concept.getName());
         assertFalse(((java.util.List<?>) detail.get("attributes")).isEmpty());

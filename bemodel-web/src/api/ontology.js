@@ -140,3 +140,8 @@ export const runProposalGeneration = () => request.post('/proposal/run')
 export const adoptProposal = (id) => request.post(`/proposal/${id}/adopt`)
 
 export const rejectProposal = (id, reason) => request.post(`/proposal/${id}/reject`, { reason })
+
+// Working model only; no release, physical SQL or architecture engines.
+export const ontologyGraph = () => request.get('/ontology/graph')
+export const previewRelation = (relation, concept, mode, direction) =>
+  request.get('/ontology/relation/preview', { params: { relation, concept, mode, direction } })

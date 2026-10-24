@@ -1,0 +1,15 @@
+﻿id,name,domain,entities,expression,source_code,status,owner
+R01,库存、承诺与合格可用分离,inbound,"['Lot', 'Offer', 'Commitment', 'Reservation']",只有当前用途、证据版本、收货、性能检验、来源核验及授权放行均成立的数量进入合格可用量。,ForgePilot/demo/app/workflow.py,existing_demo_guard,仓库负责人
+R02,保护已冻结预留,inbound,"['Reservation', 'Lot']",有效冻结预留不得挪给其他需求；同批有效占用合计不得超过实物量。,ForgePilot/demo/app/workflow.py,existing_demo_guard,仓库负责人
+R03,证据绑定确切版本与范围,quality,"['Evidence', 'EvidenceVersion', 'SourceVerification']",证据主体、场地、交货行、批次、数量及有效期逐项核验；范围证书不能代替本次交易证书。,ForgePilot/demo/app/evidence_scope.py,existing_demo_guard,质量负责人
+R04,回执幂等与超收拒绝,inbound,"['ActionReceipt', 'GoodsReceipt', 'Commitment']",同business_id同内容回查原回执，不同内容拒绝；累计收货不超过签署数量。,ForgePilot/demo/app/workflow.py,existing_demo_guard,仓库负责人
+R05,旧需求或承诺批准失效,source,"['Demand', 'Commitment', 'Offer']",数量、交期或条件变化后重新审核；旧签署和库存占用保留到释放回执。,ForgePilot/demo/app/workflow.py,existing_demo_guard,采购负责人
+R06,新鲜度与来源冲突阻断,plan,"['Demand', 'Lot']",过期快照、未裁决来源冲突不能作为新分配或新批准的依据。,ForgePilot/demo/app/input_integrity.py,existing_demo_guard,销售 / PMC
+R07,结清、付款与齐套分别计算,finance,"['ProcurementSettlement', 'Payment', 'Demand']",采购结清不证明付款，付款不证明收货，承诺不证明实际齐套。,ForgePilot/demo/app/closure.py,existing_demo_guard,财务负责人
+R08,单位与金额不隐式转换,master,"['UomConversion', 'Invoice', 'Payment']",不同物料单位、币种不得直接求和；金额以整数最小货币单位加币种记录。,,proposed,主数据管理员
+R09,BOM版本与工单绑定,make,"['BomRevision', 'ProductionOrder', 'MaterialRequirement']",工单冻结批准BOM版本；工程变更保留旧版，重新评估在制与采购影响。,,proposed,生产负责人
+R10,投入产出谱系有依据,make,"['LotGenealogy', 'MaterialIssue', 'ProductionReport']",分拆、合并与损耗均有实际事件依据；不能凭关系路径推断物料物理混配。,,proposed,生产负责人
+R11,发票付款分配守恒,finance,"['Invoice', 'InvoiceAllocation', 'Payment', 'PaymentAllocation']",同币种有效分配不超过发票或付款余额；冲销保留原记录，未分配余额单独显示。,,proposed,财务负责人
+R12,客户签收独立于发运,deliver,"['Delivery', 'CustomerAcceptance']",以实际签收与验收回执判交付，不能以物流发运状态冒充客户验收。,,proposed,物流负责人
+R13,处置授权不直接改库存,service,"['Disposition', 'ReturnOrder', 'Lot']",范围确认、质量授权、WMS执行与结案分开；实际退供回执才扣库存。,ForgePilot/demo/app/closure.py,existing_demo_guard,售后 / 质量
+R14,Agent建议与授权写入分离,govern,"['DecisionRecord', 'ActionReceipt']",只读工具不给业务写权限；批准绑定当前身份、版本、幂等键与业务守卫。,ForgePilot/demo/app/agent_runtime.py,existing_demo_guard,业务审核人 / 模型管理员

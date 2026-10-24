@@ -81,7 +81,7 @@
           <el-input v-model="form.actionCode" :disabled="dialogMode === 'edit'" placeholder="如 ACT-ORDER-CANCEL" />
         </el-form-item>
         <el-form-item label="动作动词" required>
-          <el-input v-model="form.name" placeholder="如：取消医嘱" />
+          <el-input v-model="form.name" placeholder="如：申请采购取消" />
         </el-form-item>
         <el-form-item label="作用概念" required>
           <el-select v-model="form.conceptCode" filterable style="width: 100%">

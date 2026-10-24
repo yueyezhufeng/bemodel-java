@@ -10,6 +10,7 @@ import com.bemodel.ontology.mapper.TermMapper;
 import com.bemodel.ontology.service.MissService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -25,6 +26,9 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class SearchService {
+
+    @Value("${bemodel.domain-context:工业供应链管理}")
+    private String domainContext = "工业供应链管理";
 
     private final TermMapper termMapper;
     private final ConceptMapper conceptMapper;
@@ -103,7 +107,7 @@ public class SearchService {
             ctx.append("\n请基于以上内容用中文简洁回答用户问题（不超过200字）。术语/概念/指标是口径定义，"
                     + "《文档》条目是制度条文出处；定义不足以回答的部分请说明缺口，制度条文里没有的内容不要编。");
             Optional<String> llm = deepSeekClient.chat("SEARCH_ANSWER",
-                    "你是医疗本体平台的口径解答助手，严格基于给定定义回答。", ctx.toString());
+                    "你是" + domainContext + "本体平台的口径解答助手，严格基于给定定义回答。", ctx.toString());
             if (llm.isPresent()) {
                 answer = llm.get();
                 llmUsed = true;

@@ -27,6 +27,7 @@ public class OntologyController {
     private final OntologyCheckService ontologyCheckService;
     private final MissService missService;
     private final ReleaseService releaseService;
+    private final com.bemodel.ontology.service.RelationQueryService relationQueryService;
 
     // ---------- 概念互斥 ----------
 
@@ -95,6 +96,17 @@ public class OntologyController {
     @PostMapping("/misses/{id}/classify")
     public Result<Map<String, Object>> missClassify(@PathVariable Long id) {
         return Result.ok(Map.of("suggestion", missService.classify(id)));
+    }
+
+    @GetMapping("/graph")
+    public Result<Map<String, Object>> graph() {
+        return Result.ok(relationQueryService.graph());
+    }
+
+    @GetMapping("/relation/preview")
+    public Result<Map<String, Object>> relationPreview(@RequestParam String relation, @RequestParam String concept,
+            @RequestParam(defaultValue = "closure") String mode, @RequestParam(defaultValue = "outgoing") String direction) {
+        return Result.ok(relationQueryService.preview(relation, concept, mode, direction));
     }
 
     // ---------- 传递闭包（发布时物化，此处只读） ----------

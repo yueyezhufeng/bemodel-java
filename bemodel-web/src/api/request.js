@@ -41,7 +41,7 @@ request.interceptors.response.use(
       return Promise.reject(error)
     }
     if (status === 403) {
-      ElMessage.error('权限不足：需要编辑或管理员角色')
+      ElMessage.error(error.response?.data?.msg || '权限不足：需要编辑或管理员角色')
       return Promise.reject(error)
     }
     const msg = error.response?.data?.msg || error.message || '网络异常'

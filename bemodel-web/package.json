@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:forgepilot": "vite build --mode forgepilot",
+    "dev:forgepilot": "vite --mode forgepilot",
     "preview": "vite preview"
   },
   "dependencies": {

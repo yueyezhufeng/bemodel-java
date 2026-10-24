@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ForgePilot · 工业供应链本体</title><link rel="stylesheet" href="./ontology.css">
+<link rel="stylesheet" href="/shared/forgepilot.css"></head>
+<body>
+  <aside class="rail">
+    <a class="brand" href="/"><span class="brand-mark">F/</span><span>ForgePilot<small>INDUSTRIAL ONTOLOGY</small></span></a>
+    <div class="rail-caption">供应链管理 / 业务域</div><nav id="domains" aria-label="业务域"></nav>
+    <div class="rail-bottom"><a href="http://127.0.0.1:8000/solution/index.html">一体化方案与汇报 ↗</a><span class="signal"></span> 本地模型 · v0.1.0<small>定义 → 映射 → 事实 → 决策</small><a href="/agent-display/index.html">Agent 数据流作战台 ↗</a><a href="/architecture/index.html?view=dataflow">系统数据流结构图 ↗</a></div>
+  </aside>
+  <main>
+    <header><div><span class="eyebrow">FORGEPILOT / SEMANTIC FOUNDATION</span><h1>工业供应链本体<span class="tag">草稿模型</span></h1><p>把需求、物料、供应、生产与履约，连成有依据的业务关系。</p></div><div class="header-actions"><button id="export">导出模型 ↓</button><button class="primary" id="connect">连接业务快照 ↗</button></div></header>
+    <section class="model-stats" id="model-stats" aria-label="模型规模"></section>
+    <section class="business-strip" aria-label="当前业务事实"><div><span class="eyebrow">LIVE CASE / 当前案例</span><strong id="connection-state">未连接业务数据</strong><small id="snapshot-scope">模型定义不产生库存、订单或财务事实</small></div><div id="business-metrics"></div><button id="refresh" disabled>刷新快照 ↻</button></section>
+    <div class="viewbar"><div class="tabs" role="tablist" aria-label="本体视图"><button data-view="map" role="tab" aria-selected="true">本体全景</button><button data-view="objects" role="tab">对象与属性</button><button data-view="mapping" role="tab">字段映射</button><button data-view="rules" role="tab">规则与动作</button><button data-view="gaps" role="tab">基础核对</button></div><label class="search">⌕ <input id="search" type="search" placeholder="搜索物料、批次、关系…" aria-label="搜索模型"></label></div>
+    <div class="section-heading"><div><span id="section-kicker" class="eyebrow">01 / CONNECTED SUPPLY CHAIN</span><h2 id="section-title">从业务环节，到可追溯的对象</h2></div><span class="legend"><i class="dot observed"></i>已观测实例 <i class="dot adapter"></i>已有演示适配 <i class="dot proposed"></i>待接入</span></div>
+    <section id="map-view" class="view"><div class="map-layout"><div class="graph-scroller"><svg id="graph" viewBox="0 0 1580 780" role="group" aria-label="工业供应链对象关系图"></svg></div><aside id="inspector" class="inspector" aria-label="对象详情"></aside></div><div class="graph-note">实线为选中对象的模型关系，虚线为跨环节依赖。图中的关系是类型定义；只有源事实核实后才能成为实例关联。</div></section>
+    <section id="objects-view" class="view" hidden><div class="table-wrap"><table><thead><tr><th>业务对象 / 稳定编码</th><th>定义与粒度</th><th>责任角色</th><th>属性</th><th>数据基础</th></tr></thead><tbody id="objects-body"></tbody></table></div></section>
+    <section id="mapping-view" class="view" hidden><div class="notice">源路径来自 ForgePilot 当前代码与只读适配器。ERP、MES、财务等目标源尚未取得物理字典时，不虚构表名或登记可执行 SQL 映射。</div><div class="table-wrap"><table><thead><tr><th>对象 · 属性</th><th>类型 / 单位</th><th>来源集合 / 字段</th><th>映射状态</th><th>当前快照</th></tr></thead><tbody id="mapping-body"></tbody></table></div></section>
+    <section id="rules-view" class="view" hidden><div class="rule-layout"><div id="rules-list"></div><div><h3>受控动作契约</h3><p class="muted">本体页只读展示契约。业务提交仍由原工作台按角色、版本与幂等规则执行。</p><div id="actions-list"></div></div></div></section>
+    <section id="gaps-view" class="view" hidden><div id="validation-summary" class="notice"></div><div class="gap-layout"><div><h3>按能力问题逐项核对</h3><div id="questions-list"></div></div><div><h3>发布前基础检查</h3><div id="checks-list"></div><h3>待接入对象</h3><div id="gaps-list"></div></div></div></section>
+    <footer><span id="model-release"></span><span>演示数据不代表生产接入 · 业务审核待完成</span><button id="export-snapshot" disabled>导出当前快照 ↓</button></footer>
+    <p id="load-error" role="alert" hidden></p>
+  </main>
+  <dialog id="login-dialog"><form id="login-form"><span class="eyebrow">READ-ONLY BUSINESS SNAPSHOT</span><h2>连接 ForgePilot 当前案例</h2><p>读取现有案例、修订、库存与回执，不改变业务状态。</p><label>演示角色<select name="username"><option value="buyer">采购 / PMC</option><option value="quality">质量负责人</option><option value="warehouse">仓库负责人</option><option value="operator">仿真运营员</option></select></label><label>演示密码<input name="password" type="password" value="forgepilot-demo" autocomplete="off" required></label><p id="login-error" role="alert"></p><div class="dialog-actions"><button type="button" id="cancel-login">取消</button><button type="submit" class="primary">连接只读快照</button></div></form></dialog>
+  <script type="module" src="./ontology.mjs"></script>
+</body></html>

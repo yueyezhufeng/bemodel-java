@@ -1,0 +1,9 @@
+﻿id,name,entity,unit,formula,authority,data_status,owner,execution_enabled,zero_denominator
+M01,实际材料缺口,Demand,kg,"max(0, 当前需求量 - 当前用途合格可用量)",ForgePilot summary.shortfall_kg,现有演示可核对，按需求行而非全库存计算,销售 / PMC,False,not_applicable，不填0%
+M02,其他订单保护量,Reservation,kg,其他需求的有效冻结预留合计,ForgePilot summary.protected_kg,现有演示为O2保护范围，不冒充全企业口径,仓库负责人,False,not_applicable，不填0%
+M03,供应商按时足量交付率,GoodsReceipt,%,按批准交期足量接收的到期采购行数 / 到期采购行数,ERP采购行 + WMS接收,待源接入；退货、改期及分母为0的口径需owner确认,仓库负责人,False,not_applicable，不填0%
+M04,一次检验合格率,Inspection,%,首次检验合格批次数 / 首次检验完成批次数,QMS首次检验事件,待完整检验事件；不能由当前批次状态倒推历史,质量负责人,False,not_applicable，不填0%
+M05,生产良品率,ProductionReport,%,实际良品产出 / (实际良品产出 + 实际报废产出),MES报工,待源接入；相同物料单位、工序和统计窗口,生产负责人,False,not_applicable，不填0%
+M06,客户按时验收率,CustomerAcceptance,%,约定交期内验收完成订单行数 / 到期订单行数,ERP订单 + 客户验收,待源接入；发运不能当验收,物流负责人,False,not_applicable，不填0%
+M07,应付未分配余额,Payment,minor_currency,有效付款额 - 同币种有效付款分配额,财务付款 + PaymentAllocation,待源接入；币种分组、冲销另计，不隐式换汇,财务负责人,False,not_applicable，不填0%
+M08,处置关闭周期,Disposition,minute,实际结案时点 - 处置创建时点,WMS/QMS处置事件,待全生命周期时间戳；未结案列在途账龄而非0,售后 / 质量,False,not_applicable，不填0%

@@ -1,8 +1,8 @@
 <template>
   <div class="login-page">
     <el-card class="login-card">
-      <div class="login-title">BeModel</div>
-      <div class="login-subtitle">医疗本体平台</div>
+      <div class="login-title">ForgePilot</div>
+      <div class="login-subtitle">工业供应链本体管理</div>
       <el-form :model="form" @keyup.enter="submit">
         <el-form-item>
           <el-input v-model="form.username" placeholder="用户名" :prefix-icon="User" size="large" />

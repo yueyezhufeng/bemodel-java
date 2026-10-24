@@ -43,6 +43,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class OntologyProposalService extends ServiceImpl<OntologyProposalMapper, OntologyProposal> {
 
+    @Value("${bemodel.domain-context:工业供应链管理}")
+    private String domainContext = "工业供应链管理";
+
     private final OntologyMissMapper missMapper;
     private final ProposalRunMapper runMapper;
     private final MissService missService;
@@ -132,7 +135,7 @@ public class OntologyProposalService extends ServiceImpl<OntologyProposalMapper,
      */
     private Map<String, Object> suggest(OntologyMiss miss) {
         Optional<String> llm = deepSeekClient.chat("MISS_PROPOSAL",
-                "你是医疗本体治理助手，为词表外说法做近义预审并给出候选概念卡。只返回JSON，不要多余文字。",
+                "你是" + domainContext + "本体治理助手，为词表外说法做近义预审并给出候选概念卡。只返回JSON，不要多余文字。",
                 buildProposalPrompt(miss));
         if (llm.isEmpty()) {
             return null;
@@ -185,7 +188,7 @@ public class OntologyProposalService extends ServiceImpl<OntologyProposalMapper,
         sb.append("2) action=ATTACH_TERM：已有概念就是该说法的归宿，targetConceptCode 填既有概念编码");
         sb.append("（含义是把该说法作为其方言术语/别名归并，不是新建）。\n");
         sb.append("只返回JSON对象：{\"action\":\"NEW_CONCEPT|ATTACH_TERM\",");
-        sb.append("\"code\":\"仅NEW_CONCEPT：大写蛇形编码（风格参考 INP_VISIT、FEE_DETAIL）\",");
+        sb.append("\"code\":\"仅NEW_CONCEPT：稳定业务编码（风格参考 Lot、Demand）\",");
         sb.append("\"name\":\"仅NEW_CONCEPT：中文名称\",");
         sb.append("\"domainCode\":\"仅NEW_CONCEPT：业务域编码\",");
         sb.append("\"definition\":\"仅NEW_CONCEPT：业务定义\",");

@@ -85,7 +85,7 @@ public class InstanceService {
                     Object raw = row.get(m.getColumnName());
                     String attrKey = attrNameByCode.getOrDefault(m.getAttrCode(), m.getAttrCode());
                     Object value = decodeValue(m, raw);
-                    // 患者姓名类列在投影出口打码（inhos_no 等业务键列保留）
+                    // 联系人或员工姓名在投影出口打码，批次与订单业务键保留
                     if ((Masking.isNameKey(m.getColumnName()) || Masking.isNameKey(attrKey))
                             && !"-".equals(value)) {
                         value = Masking.maskName(String.valueOf(value));

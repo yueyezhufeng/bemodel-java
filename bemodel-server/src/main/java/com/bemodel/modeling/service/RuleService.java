@@ -19,7 +19,13 @@ public class RuleService extends ServiceImpl<RuleMapper, Rule> {
                 .list();
     }
 
+    public static void requireContract(Rule rule) {
+        if (rule.getEngine() == null || rule.getEngine().isBlank()) rule.setEngine("CONTRACT");
+        if (!"CONTRACT".equals(rule.getEngine())) throw new BizException("工业规则仅支持 CONTRACT 定义，不提供业务执行器");
+    }
+
     public Rule create(Rule rule) {
+        requireContract(rule);
         if (lambdaQuery().eq(Rule::getRuleCode, rule.getRuleCode()).count() > 0) {
             throw new BizException("规则编码已存在: " + rule.getRuleCode());
         }

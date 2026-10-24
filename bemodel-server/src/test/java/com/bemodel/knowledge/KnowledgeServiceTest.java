@@ -123,7 +123,7 @@ class KnowledgeServiceTest {
         k.setCode("TEST_ENTRY_XYZ");
         k.setTitle("测试条目");
         k.setContent("初版内容。");
-        k.setAppliesTo("FEE_DETAIL");
+        k.setAppliesTo("Lot");
         k.setSource("ADMIN");
         k.setStatus("PUBLISHED");
         k.setVersion(1);
@@ -132,7 +132,7 @@ class KnowledgeServiceTest {
         createdEntries.add(k.getId());
 
         assertEquals("初版内容。", knowledgeService.entryContent("TEST_ENTRY_XYZ"));
-        assertTrue(knowledgeService.basisFor("FEE_DETAIL").contains("初版内容。"), "依据位应包含已发布条目正文");
+        assertTrue(knowledgeService.basisFor("Lot").contains("初版内容。"), "依据位应包含已发布条目正文");
 
         k.setContent("修订内容。");
         knowledgeService.updateEntry(k);
